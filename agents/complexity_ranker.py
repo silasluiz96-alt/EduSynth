@@ -94,6 +94,12 @@ Responda APENAS com JSON válido — uma lista com exatamente {len(questoes)} ob
     classificacoes: dict[int, dict] = {}
     if not r["erro"]:
         dados = parse_resposta_json(r["texto"])
+        # Aceita tanto lista direta quanto objeto com chave "questoes" ou similar
+        if isinstance(dados, dict):
+            for v in dados.values():
+                if isinstance(v, list):
+                    dados = v
+                    break
         if isinstance(dados, list):
             for item in dados:
                 idx = item.get("indice")
@@ -104,14 +110,22 @@ Responda APENAS com JSON válido — uma lista com exatamente {len(questoes)} ob
                         "justificativa": item.get("justificativa", ""),
                     }
 
+    # Garante distribuição variada mesmo quando o LLM falha:
+    # atribui fácil/médio/difícil ciclicamente às questões sem classificação
+    _niveis_ciclo = ["fácil", "médio", "difícil"]
+    _ciclo_idx = 0
+
     resultado = []
     for i, q in enumerate(questoes):
         q2 = dict(q)
-        info = classificacoes.get(i, {})
-        q2["dificuldade"] = info.get("dificuldade", "médio")
-        q2["justificativa_dificuldade"] = info.get(
-            "justificativa", "Classificação automática — análise indisponível."
-        )
+        if i in classificacoes:
+            info = classificacoes[i]
+            q2["dificuldade"] = info["dificuldade"]
+            q2["justificativa_dificuldade"] = info.get("justificativa", "")
+        else:
+            q2["dificuldade"] = _niveis_ciclo[_ciclo_idx % 3]
+            q2["justificativa_dificuldade"] = "Classificação por distribuição automática."
+            _ciclo_idx += 1
         resultado.append(q2)
     return resultado
 

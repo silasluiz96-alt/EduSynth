@@ -374,6 +374,7 @@ def _init_state():
         "tema_input":       "",
         "carregando":       False,
         "tema_pendente":    "",
+        "cache_temas":      {},   # tema_key → resultado completo do pipeline
         # Questão
         "tentativas":       0,
         "nivel_dica_atual": 0,
@@ -902,6 +903,24 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
 
     _show("🔍 Pesquisador", "Pesquisando nas melhores fontes para você...", 0)
 
+    # ── Cache: reutiliza resultado se o tema já foi pesquisado nessa sessão ──
+    _tema_key = tema.lower().replace(" ", "")
+    _cache = st.session_state.get("cache_temas", {})
+    if _tema_key in _cache:
+        loading_area.empty()
+        st.session_state["resultado_atual"]  = _cache[_tema_key]
+        st.session_state["carregando"]       = False
+        st.session_state["tema_pendente"]    = ""
+        st.session_state["fila_questoes"]    = _cache[_tema_key].get("_fila", [])
+        st.session_state["fila_idx"]         = 0
+        st.session_state["questao_atual"]    = st.session_state["fila_questoes"][0] if st.session_state["fila_questoes"] else None
+        st.session_state.update({
+            "nivel_dica_atual": 0, "dicas_texto": [], "gabarito_texto": None,
+            "tentativas": 0, "resposta_correta": False, "letra_escolhida": None,
+            "oferta_ia_vista": False, "questao_ia_ativa": False, "fila_concluida": False,
+        })
+        st.rerun()
+
     _erro_pipeline = None
     try:
         from agents.researcher  import pesquisar   as _pesquisar
@@ -923,6 +942,7 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
         post_agent_hook("Pesquisador", _t, success=True)
 
         _show("🧠 Crítico", "Analisando o que mais cai no ENEM...", 1)
+        time.sleep(3)  # respeita limite 20 req/min
         _t = pre_agent_hook("Crítico")
         r_critica = _analisar(r_pesquisa)
         if r_critica.get("erro"):
@@ -931,6 +951,7 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
         post_agent_hook("Crítico", _t, success=True)
 
         _show("📝 Sintetizador", "Preparando seu material personalizado com carinho...", 2)
+        time.sleep(3)  # respeita limite 20 req/min
         _t = pre_agent_hook("Sintetizador")
         r_sintese = _sintetizar(r_pesquisa, r_critica, edu._analista.snapshot())
         if r_sintese.get("erro"):
@@ -960,10 +981,15 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
             st.session_state["fila_questoes"] = []
             st.session_state["questao_atual"] = None
 
-        st.session_state["resultado_atual"] = {
+        _resultado = {
             "tema": tema, "pesquisa": r_pesquisa,
             "critica": r_critica, "sintese": r_sintese,
+            "_fila": st.session_state.get("fila_questoes", []),
         }
+        st.session_state["resultado_atual"] = _resultado
+        # Salva no cache da sessão para evitar reprocessamento
+        st.session_state["cache_temas"][_tema_key] = _resultado
+
         hist = [(t, a, d) for t, a, d in st.session_state["historico"] if t != tema]
         hist.append((tema, "não informada", 0))
         st.session_state["historico"] = hist

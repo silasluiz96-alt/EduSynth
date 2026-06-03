@@ -112,6 +112,7 @@ class KnowSynth:
             return resultado
 
         # ── Passo 2: Crítico ──────────────────────────────────────────────────
+        time.sleep(3)  # respeita limite de 20 req/min do Gemini
         t0 = pre_agent_hook("Crítico")
         try:
             resultado_critica = analisar(resultado_pesquisa)
@@ -137,6 +138,7 @@ class KnowSynth:
             return resultado
 
         # ── Passo 3: Sintetizador ─────────────────────────────────────────────
+        time.sleep(3)  # respeita limite de 20 req/min do Gemini
         t0 = pre_agent_hook("Sintetizador")
         try:
             snapshot = self._analista.snapshot()
