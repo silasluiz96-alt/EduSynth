@@ -12,9 +12,9 @@ import re
 from dotenv import load_dotenv
 
 try:
-    from agents.groq_utils import chamar_groq
+    from agents.groq_utils import chamar_llm as chamar_groq
 except ImportError:
-    from groq_utils import chamar_groq
+    from groq_utils import chamar_llm as chamar_groq
 
 load_dotenv()
 

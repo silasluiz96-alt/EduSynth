@@ -2,3 +2,4 @@ groq
 tavily-python
 streamlit
 python-dotenv
+google-generativeai
