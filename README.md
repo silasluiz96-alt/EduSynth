@@ -6,7 +6,7 @@
 
 ## 📌 Sobre o Projeto
 
-O **EduSynth** é uma aplicação web que combina **5 agentes de inteligência artificial** trabalhando em pipeline para transformar qualquer tema ou palavra-chave do ENEM em um material de estudo completo, com questão original, análise estratégica e dicas progressivas para resolução.
+O **EduSynth** é uma aplicação web que combina **6 agentes de inteligência artificial** trabalhando em pipeline para transformar qualquer tema ou palavra-chave do ENEM em um material de estudo completo, com questão original, análise estratégica e dicas progressivas para resolução.
 
 Ao digitar um tema como *"fordismo"* ou *"aquecimento global"*, o sistema:
 
