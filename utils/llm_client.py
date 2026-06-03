@@ -77,17 +77,22 @@ def _chamar_gemini(prompt: str, system_prompt: str | None, max_tokens: int) -> d
             config=config,
         )
 
-        # Detecta corte por limite de tokens (JSON incompleto = inútil)
+        texto = resposta.text or ""
+
+        # MAX_TOKENS: retorna o texto gerado até agora como resposta válida.
+        # Não faz fallback — o conteúdo já existe, só foi cortado no limite.
         if resposta.candidates:
             finish = resposta.candidates[0].finish_reason
             if hasattr(finish, "name") and finish.name == "MAX_TOKENS":
                 log.warning(
-                    "Gemini atingiu MAX_TOKENS (max_tokens=%d) — fallback para Groq.",
+                    "Gemini atingiu MAX_TOKENS (max_tokens=%d) — usando texto parcial.",
                     max_tokens,
                 )
-                return None
+                # Se não há texto algum, aí sim é erro real
+                if not texto.strip():
+                    log.warning("Gemini: MAX_TOKENS sem texto — fallback para Groq.")
+                    return None
 
-        texto = resposta.text or ""
         if not texto.strip():
             log.warning("Gemini retornou texto vazio — fallback para Groq.")
             return None
