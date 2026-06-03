@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 # ── Configuração dos modelos ──────────────────────────────────────────────────
 
-_MODELO_GEMINI = "gemini-2.5-flash"
+_MODELO_GEMINI = "gemini-2.0-flash"
 _MODELO_GROQ   = "llama-3.3-70b-versatile"
 
 _MSG_INDISPONIVEL = (
