@@ -227,7 +227,7 @@ def sintetizar(
 
     prompt = _montar_prompt(tema, pesquisa_txt, critica_txt, desempenho_txt)
 
-    r = chamar_llm(prompt=prompt, system_prompt=skill, max_tokens=4000)
+    r = chamar_llm(prompt=prompt, system_prompt=skill, max_tokens=2000)
     if r["erro"]:
         return _resultado_erro(tema, r["erro"])
 

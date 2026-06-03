@@ -88,7 +88,7 @@ Responda APENAS com JSON válido — uma lista com exatamente {len(questoes)} ob
     r = chamar_llm(
         prompt=prompt,
         system_prompt=SYSTEM_PROMPT,
-        max_tokens=min(150 * len(questoes), 2000),
+        max_tokens=500,
     )
 
     classificacoes: dict[int, dict] = {}

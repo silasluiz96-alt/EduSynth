@@ -164,40 +164,21 @@ def pesquisar(input_usuario: str) -> dict:
             "tipo_fonte": "portal de notícias confiável",
         })
 
-    # ── Camada 3 — Referências Acadêmicas ────────────────────────────────────
-    resp_academico = _buscar(client, queries["academico"], max_results=3)
-    referencias_academicas = _extrair_fontes(resp_academico)
-    resumo_academico = resp_academico.get("answer", "")
-    if resp_academico.get("_erro") or not referencias_academicas:
-        lacunas.append({
-            "camada": "referências acadêmicas",
-            "descricao": "Não foram encontrados artigos acadêmicos acessíveis sobre o tema.",
-            "palavras_chave_pt": [f"{input_usuario} pesquisa científica", f"{input_usuario} artigo"],
-            "palavras_chave_en": [f"{input_usuario} research", f"{input_usuario} academic paper"],
-            "sugestao_busca": f"Digite no Google Scholar: '{input_usuario}'",
-            "tipo_fonte": "artigo científico ou dissertação",
-        })
+    # Busca acadêmica removida (v1) — economiza 1 chamada Tavily por pesquisa
+    referencias_academicas: list = []
 
     # ── Monta resumo integrado ────────────────────────────────────────────────
-    partes_resumo = [p for p in [resumo_didatico, resumo_noticias, resumo_academico] if p]
+    partes_resumo = [p for p in [resumo_didatico, resumo_noticias] if p]
     resumo = " | ".join(partes_resumo) if partes_resumo else (
-        f"Conteúdo coletado sobre '{input_usuario}' a partir de {len(conteudo_didatico + noticias_relevantes + referencias_academicas)} fontes."
+        f"Conteúdo coletado sobre '{input_usuario}' a partir de {len(conteudo_didatico + noticias_relevantes)} fontes."
     )
 
-    # ── Termos relacionados (busca extra para palavra-chave) ──────────────────
+    # Termos relacionados extraídos do resumo didático (sem chamada extra ao Tavily)
     termos_relacionados = []
-    if tipo == "palavra_chave":
-        resp_termos = _buscar(
-            client,
-            f"{input_usuario} termos relacionados ENEM conceitos associados",
-            max_results=2,
-        )
-        answer_termos = resp_termos.get("answer", "")
-        if answer_termos:
-            # Extrai termos curtos separados por vírgula/ponto-e-vírgula
-            import re as _re
-            candidatos = _re.split(r"[,;]", answer_termos)
-            termos_relacionados = [t.strip() for t in candidatos if 2 < len(t.strip()) < 60][:8]
+    if tipo == "palavra_chave" and resumo_didatico:
+        import re as _re
+        candidatos = _re.split(r"[,;]", resumo_didatico)
+        termos_relacionados = [t.strip() for t in candidatos if 3 < len(t.strip()) < 50][:6]
 
     return {
         "tema": input_usuario,
