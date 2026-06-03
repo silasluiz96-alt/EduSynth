@@ -243,15 +243,13 @@ def get_random_question(discipline: str = None) -> dict | None:
     return None
 
 
-def search_questions_by_topic(topic: str, limit: int = 15) -> list[dict]:
+def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
     """
-    Busca questões relacionadas a um tema percorrendo todos os anos disponíveis
-    com paginação completa.
+    Busca questões relacionadas a um tema nos anos 2022 e 2023.
 
-    MELHORIAS:
-    - Paginação automática (não só 45/ano)
-    - Termos expandidos (sinônimos automáticos)
-    - Fallback: se 0 resultados, retorna questões aleatórias dos anos recentes
+    Limites para reduzir requisições HTTP à enem.dev:
+    - Apenas os 2 anos mais recentes (2022, 2023)
+    - Para assim que encontrar `limit` questões (padrão: 10)
 
     Retorna até `limit` questões.
     """
@@ -260,9 +258,9 @@ def search_questions_by_topic(topic: str, limit: int = 15) -> list[dict]:
         log.warning("get_exams() retornou vazio")
         return []
 
-    _ANOS_PERMITIDOS = {2019, 2020, 2021, 2022, 2023}
-    anos    = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
-    termos  = _termos_busca(topic)
+    _ANOS_PERMITIDOS = {2022, 2023}
+    anos   = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
+    termos = _termos_busca(topic)
     log.info(f"search_questions_by_topic('{topic}') | termos: {termos} | anos: {anos}")
 
     encontradas = []
@@ -271,7 +269,7 @@ def search_questions_by_topic(topic: str, limit: int = 15) -> list[dict]:
         if len(encontradas) >= limit:
             break
         try:
-            todas_do_ano = _buscar_paginas(ano, max_questoes=200)
+            todas_do_ano = _buscar_paginas(ano, max_questoes=90)
             for q in todas_do_ano:
                 if _questao_contem_tema(q, termos):
                     encontradas.append(q)
@@ -284,19 +282,18 @@ def search_questions_by_topic(topic: str, limit: int = 15) -> list[dict]:
 
     log.info(f"search_questions_by_topic → {len(encontradas)} questões encontradas para '{topic}'")
 
-    # Fallback: se 0 resultados, retorna questões aleatórias dos 3 anos mais recentes
+    # Fallback: se 0 resultados, retorna questões aleatórias dos anos disponíveis
     if not encontradas:
         log.warning(f"Nenhuma questão encontrada para '{topic}'. Usando fallback aleatório.")
         pool = []
-        for ano in anos[:3]:  # fallback nos 3 anos mais recentes do intervalo permitido
+        for ano in anos:
             try:
-                pool.extend(_buscar_paginas(ano, max_questoes=90))
+                pool.extend(_buscar_paginas(ano, max_questoes=45))
             except Exception:
                 continue
 
         if pool:
             encontradas = random.sample(pool, min(limit, len(pool)))
-            # Marca que são de fallback (tema não encontrado)
             for q in encontradas:
                 q["_fallback"] = True
             log.info(f"  Fallback: {len(encontradas)} questões aleatórias retornadas")
