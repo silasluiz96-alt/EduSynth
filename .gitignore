@@ -1,0 +1,19 @@
+# Variáveis de ambiente — nunca commitar chaves
+.env
+
+# Arquivos temporários do editor
+*.tmp.*
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# Streamlit
+.streamlit/
+
+# IDEs
+.vscode/
+.idea/

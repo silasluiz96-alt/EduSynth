@@ -1,0 +1,27 @@
+{
+  "project": {
+    "name": "EduSynth",
+    "description": "Sistema multi-agent de estudo para o ENEM usando Claude Code nativo",
+    "version": "1.0.0"
+  },
+  "agents": {
+    "researcher": {
+      "skill": ".claude/skills/researcher.md",
+      "mcp": "claude-in-chrome"
+    },
+    "critic": {
+      "skill": ".claude/skills/critic.md"
+    },
+    "synthesizer": {
+      "skill": ".claude/skills/synthesizer.md"
+    }
+  },
+  "mcp": {
+    "tavily": {
+      "enabled": true
+    },
+    "claude-in-chrome": {
+      "enabled": true
+    }
+  }
+}
