@@ -11,11 +11,12 @@ CORREÇÕES aplicadas:
 """
 
 import os
+import sys
+import json
 import random
 import logging
 from dotenv import load_dotenv
 import requests
-from groq import Groq
 
 load_dotenv()
 
@@ -243,13 +244,72 @@ def get_random_question(discipline: str = None) -> dict | None:
     return None
 
 
+def _selecionar_por_llm(topic: str, questoes: list[dict], limit: int = 10) -> list[dict]:
+    """
+    Usa LLM para selecionar as questões mais relevantes para o tema.
+    Envia até 20 questões brutas e pede os índices das melhores.
+    Retorna até `limit` questões. Se o LLM falhar, devolve as brutas sem filtro.
+    """
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+        from utils.llm_client import chamar_llm, parse_resposta_json
+    except ImportError:
+        log.warning("llm_client não encontrado — sem filtragem LLM.")
+        return questoes[:limit]
+
+    # Monta lista resumida para o prompt (título + enunciado curto)
+    lista_txt = ""
+    for i, q in enumerate(questoes):
+        enunciado = (q.get("enunciado") or q.get("contexto") or "")[:120]
+        lista_txt += f"{i}. [{q.get('ano')}] {enunciado}\n"
+
+    prompt = (
+        f"Dado o tema '{topic}', selecione as {limit} questões mais relevantes "
+        f"da lista abaixo.\n"
+        f"Retorne apenas os índices em JSON: {{\"indices\": [0, 3, 7, ...]}}\n\n"
+        f"{lista_txt}"
+    )
+
+    r = chamar_llm(prompt=prompt, max_tokens=200)
+    if r.get("erro") or not r.get("texto"):
+        log.warning("LLM não respondeu — usando questões sem filtro.")
+        return questoes[:limit]
+
+    dados = parse_resposta_json(r["texto"])
+    indices = dados.get("indices", [])
+
+    if not isinstance(indices, list) or not indices:
+        log.warning("LLM retornou índices inválidos — usando questões sem filtro.")
+        return questoes[:limit]
+
+    selecionadas = []
+    for idx in indices:
+        if isinstance(idx, int) and 0 <= idx < len(questoes):
+            selecionadas.append(questoes[idx])
+        if len(selecionadas) >= limit:
+            break
+
+    # Completa com as restantes caso o LLM tenha retornado poucos índices
+    if len(selecionadas) < limit:
+        vistos = set(id(q) for q in selecionadas)
+        for q in questoes:
+            if id(q) not in vistos:
+                selecionadas.append(q)
+            if len(selecionadas) >= limit:
+                break
+
+    log.info(f"_selecionar_por_llm → {len(selecionadas)} questões selecionadas para '{topic}'")
+    return selecionadas
+
+
 def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
     """
     Busca questões relacionadas a um tema nos anos 2022 e 2023.
 
-    Limites para reduzir requisições HTTP à enem.dev:
-    - Apenas os 2 anos mais recentes (2022, 2023)
-    - Para assim que encontrar `limit` questões (padrão: 10)
+    Fluxo:
+    1. Coleta até 20 questões brutas dos anos 2022 e 2023
+    2. Usa LLM para selecionar as `limit` mais relevantes ao tema
+    3. A heurística de complexidade classifica as selecionadas
 
     Retorna até `limit` questões.
     """
@@ -259,46 +319,31 @@ def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
         return []
 
     _ANOS_PERMITIDOS = {2022, 2023}
-    anos   = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
-    termos = _termos_busca(topic)
-    log.info(f"search_questions_by_topic('{topic}') | termos: {termos} | anos: {anos}")
+    anos = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
+    log.info(f"search_questions_by_topic('{topic}') | anos: {anos}")
 
-    encontradas = []
+    brutas = []
+    budget = limit * 2  # coleta até 2× o limite para dar opção ao LLM
 
     for ano in anos:
-        if len(encontradas) >= limit:
+        if len(brutas) >= budget:
             break
         try:
             todas_do_ano = _buscar_paginas(ano, max_questoes=90)
-            for q in todas_do_ano:
-                if _questao_contem_tema(q, termos):
-                    encontradas.append(q)
-                    log.info(f"  ✓ Encontrada: [{ano}] {q.get('titulo','')[:60]}")
-                    if len(encontradas) >= limit:
-                        break
+            brutas.extend(todas_do_ano)
+            log.info(f"  Coletadas {len(todas_do_ano)} brutas do ano {ano}")
         except Exception as e:
             log.warning(f"  Erro ao processar ano {ano}: {e}")
             continue
 
-    log.info(f"search_questions_by_topic → {len(encontradas)} questões encontradas para '{topic}'")
+    brutas = brutas[:budget]  # garante no máximo 20
 
-    # Fallback: se 0 resultados, retorna questões aleatórias dos anos disponíveis
-    if not encontradas:
-        log.warning(f"Nenhuma questão encontrada para '{topic}'. Usando fallback aleatório.")
-        pool = []
-        for ano in anos:
-            try:
-                pool.extend(_buscar_paginas(ano, max_questoes=45))
-            except Exception:
-                continue
+    if not brutas:
+        log.warning(f"Nenhuma questão coletada para '{topic}'.")
+        return []
 
-        if pool:
-            encontradas = random.sample(pool, min(limit, len(pool)))
-            for q in encontradas:
-                q["_fallback"] = True
-            log.info(f"  Fallback: {len(encontradas)} questões aleatórias retornadas")
-
-    return encontradas
+    # Filtra pelo LLM e retorna as mais relevantes
+    return _selecionar_por_llm(topic, brutas, limit=limit)
 
 
 def get_questions_by_difficulty(topic: str, discipline: str = None) -> dict:

@@ -375,6 +375,7 @@ def _init_state():
         "carregando":       False,
         "tema_pendente":    "",
         "cache_temas":      {},   # tema_key → resultado completo do pipeline
+        "limpando":         False,  # flag: tela limpa antes de iniciar carregamento
         # Questão
         "tentativas":       0,
         "nivel_dica_atual": 0,
@@ -865,30 +866,41 @@ if _esta_carregando:
     st.markdown('<div class="ks-disabled-hint">⏳ Aguarde — seus agentes estão trabalhando...</div>', unsafe_allow_html=True)
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
-# Balão clicado: define tema pendente e ativa carregamento
-if st.session_state.get("balao_clicado") and st.session_state["tema_input"]:
-    st.session_state["balao_clicado"] = False
-    st.session_state["tema_pendente"] = st.session_state["tema_input"]
-    st.session_state["carregando"]    = True
+
+def _iniciar_tema(tema: str):
+    """
+    Passo 1: limpa todo o conteúdo anterior e sinaliza 'limpando'.
+    O rerun seguinte mostra a tela com balões (estado zerado).
+    Passo 2: no próximo rerun, limpando=False e carregando=True dispara o pipeline.
+    """
     st.session_state.update({
+        "resultado_atual":  None,
+        "tema_input":       tema,
+        "tema_pendente":    tema,
+        "limpando":         True,
+        "carregando":       False,
+        # Questão
         "nivel_dica_atual": 0, "dicas_texto": [], "gabarito_texto": None,
         "tentativas": 0, "resposta_correta": False, "letra_escolhida": None,
+        # Fila
         "fila_questoes": [], "fila_idx": 0, "questao_atual": None,
         "oferta_ia_vista": False, "questao_ia_ativa": False, "fila_concluida": False,
     })
     st.rerun()
 
-# Botão "Estudar Agora": define tema pendente e ativa carregamento
+# Balão clicado
+if st.session_state.get("balao_clicado") and st.session_state["tema_input"]:
+    st.session_state["balao_clicado"] = False
+    _iniciar_tema(st.session_state["tema_input"])
+
+# Botão "Estudar Agora"
 if iniciar and tema_digitado.strip():
-    st.session_state.update({
-        "tema_input":       tema_digitado.strip(),
-        "tema_pendente":    tema_digitado.strip(),
-        "carregando":       True,
-        "nivel_dica_atual": 0, "dicas_texto": [], "gabarito_texto": None,
-        "tentativas": 0, "resposta_correta": False, "letra_escolhida": None,
-        "fila_questoes": [], "fila_idx": 0, "questao_atual": None,
-        "oferta_ia_vista": False, "questao_ia_ativa": False, "fila_concluida": False,
-    })
+    _iniciar_tema(tema_digitado.strip())
+
+# Passo 2: tela já está limpa → agora ativa o carregamento
+if st.session_state.get("limpando") and st.session_state.get("tema_pendente"):
+    st.session_state["limpando"]  = False
+    st.session_state["carregando"] = True
     st.rerun()
 
 # ── Execução do pipeline com tela imersiva ────────────────────────────────────
