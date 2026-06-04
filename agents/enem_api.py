@@ -49,28 +49,58 @@ _PALAVRAS_ESPANHOL = {
     "pero", "más", "también",
 }
 
-# Mapa de termos expandidos para busca por tema
-# Quando o tema não for encontrado literalmente, tenta sinônimos relacionados
-_EXPANSAO_TEMAS = {
+# Mapa tema → disciplina na API enem.dev
+TEMA_DISCIPLINA: dict[str, str] = {
     # Ciências Humanas
-    "revolução industrial":          ["revolucao industrial", "vapor", "industrializacao", "operario", "fabrica"],
-    "segunda guerra mundial":        ["segunda guerra", "nazismo", "holocausto", "aliados", "hitler"],
-    "ditadura militar brasileira":   ["ditadura militar", "golpe 64", "AI-5", "regime militar", "redemocratizacao"],
-    "globalização":                  ["globalizacao", "neoliberal", "mercado global", "fmi", "interdependencia"],
+    "revolução industrial":        "ciencias-humanas",
+    "segunda guerra mundial":      "ciencias-humanas",
+    "ditadura militar brasileira": "ciencias-humanas",
+    "globalização":                "ciencias-humanas",
     # Ciências da Natureza
-    "aquecimento global":            ["aquecimento global", "efeito estufa", "clima", "carbono", "mudancas climaticas"],
-    "fotossíntese":                  ["fotossintese", "clorofila", "luz solar", "glicose", "cloroplasto"],
-    "genética mendeliana":           ["mendel", "hereditariedade", "dominante", "recessivo", "gene"],
-    "leis de newton":                ["newton", "inercia", "forca", "movimento", "dinamica"],
+    "aquecimento global":          "ciencias-natureza",
+    "fotossíntese":                "ciencias-natureza",
+    "genética mendeliana":         "ciencias-natureza",
+    "leis de newton":              "ciencias-natureza",
     # Matemática
-    "funções do 1º e 2º grau":       ["funcao", "funcoes", "parabola", "raiz", "coeficiente", "equacao"],
-    "progressão aritmética":         ["progressao aritmetica", "pa", "razao", "sequencia", "termo"],
-    "probabilidade":                 ["probabilidade", "evento", "espaco amostral", "combinatoria"],
-    "geometria plana":               ["geometria plana", "area", "perimetro", "triangulo", "circulo"],
+    "funções do 1º e 2º grau":    "matematica",
+    "progressão aritmética":       "matematica",
+    "probabilidade":               "matematica",
+    "geometria plana":             "matematica",
     # Linguagens
-    "modernismo brasileiro":         ["modernismo", "semana de arte moderna", "1922", "vanguarda"],
-    "interpretação de texto":        ["interpretacao", "inferencia", "compreensao", "leitura", "enunciado"],
-    "figuras de linguagem":          ["figura de linguagem", "metafora", "metonimia", "ironia", "hiperbole"],
+    "modernismo brasileiro":       "linguagens",
+    "interpretação de texto":      "linguagens",
+    "figuras de linguagem":        "linguagens",
+}
+
+# Offset inicial por disciplina (onde as questões dessa disciplina começam na prova)
+_OFFSET_DISCIPLINA: dict[str, int] = {
+    "linguagens":       0,
+    "ciencias-humanas": 43,
+    "ciencias-natureza": 90,
+    "matematica":       135,
+}
+
+# Mapa tema → palavras-chave para filtro de texto (sem LLM)
+_KEYWORDS_TEMA: dict[str, list[str]] = {
+    # Ciências Humanas
+    "revolução industrial":        ["revolução industrial", "industrialização", "vapor", "operário", "fábrica", "ford", "taylor"],
+    "segunda guerra mundial":      ["segunda guerra", "nazismo", "holocausto", "hitler", "aliados", "guerra mundial"],
+    "ditadura militar brasileira": ["ditadura militar", "golpe", "regime militar", "AI-5", "redemocratização", "censura"],
+    "globalização":                ["globalização", "neoliberal", "mercado global", "fmi", "interdependência", "livre-comércio"],
+    # Ciências da Natureza
+    "aquecimento global":          ["aquecimento global", "efeito estufa", "clima", "carbono", "emissão", "temperatura"],
+    "fotossíntese":                ["fotossíntese", "clorofila", "luz solar", "glicose", "cloroplasto", "fotossintético"],
+    "genética mendeliana":         ["mendel", "hereditariedade", "dominante", "recessivo", "gene", "genótipo", "fenótipo"],
+    "leis de newton":              ["newton", "inércia", "força", "movimento", "aceleração", "dinâmica", "gravitação"],
+    # Matemática
+    "funções do 1º e 2º grau":    ["função", "parábola", "raiz", "coeficiente", "equação", "gráfico"],
+    "progressão aritmética":       ["progressão aritmética", "razão", "sequência", "termo", "pa"],
+    "probabilidade":               ["probabilidade", "evento", "espaço amostral", "combinatória", "chance"],
+    "geometria plana":             ["área", "perímetro", "triângulo", "círculo", "quadrado", "polígono"],
+    # Linguagens
+    "modernismo brasileiro":       ["modernismo", "semana de arte moderna", "1922", "vanguarda", "modernista"],
+    "interpretação de texto":      ["inferência", "compreensão", "leitura", "texto", "interpretação"],
+    "figuras de linguagem":        ["metáfora", "metonímia", "ironia", "hipérbole", "figura de linguagem"],
 }
 
 
@@ -302,111 +332,83 @@ def get_random_question(discipline: str = None) -> dict | None:
     return None
 
 
-def _selecionar_por_llm(topic: str, questoes: list[dict], limit: int = 10) -> list[dict]:
-    """
-    Usa LLM para selecionar as questões mais relevantes para o tema.
-    Envia até 20 questões brutas e pede os índices das melhores.
-    Retorna até `limit` questões. Se o LLM falhar, devolve as brutas sem filtro.
-    """
-    try:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-        from utils.llm_client import chamar_llm, parse_resposta_json
-    except ImportError:
-        log.warning("llm_client não encontrado — sem filtragem LLM.")
-        return questoes[:limit]
-
-    # Monta lista resumida para o prompt (título + enunciado curto)
-    lista_txt = ""
-    for i, q in enumerate(questoes):
-        enunciado = (q.get("enunciado") or q.get("contexto") or "")[:120]
-        lista_txt += f"{i}. [{q.get('ano')}] {enunciado}\n"
-
-    prompt = (
-        f"Você é um especialista em ENEM. Dado o tema '{topic}', selecione APENAS "
-        f"as questões que tratam DIRETAMENTE desse tema. Ignore questões que apenas "
-        f"mencionam o tema superficialmente.\n"
-        f"Retorne apenas os índices em JSON: {{\"indices\": [0, 3, 7]}}.\n"
-        f"Se nenhuma questão for relevante, retorne {{\"indices\": []}}.\n\n"
-        f"{lista_txt}"
-    )
-
-    r = chamar_llm(prompt=prompt, max_tokens=200)
-    if r.get("erro") or not r.get("texto"):
-        log.warning("LLM não respondeu — usando questões sem filtro.")
-        return questoes[:limit]
-
-    dados = parse_resposta_json(r["texto"])
-    indices = dados.get("indices", [])
-
-    if not isinstance(indices, list) or not indices:
-        log.warning("LLM retornou índices inválidos — usando questões sem filtro.")
-        return questoes[:limit]
-
-    selecionadas = []
-    for idx in indices:
-        if isinstance(idx, int) and 0 <= idx < len(questoes):
-            selecionadas.append(questoes[idx])
-        if len(selecionadas) >= limit:
-            break
-
-    # Completa com as restantes caso o LLM tenha retornado poucos índices
-    if len(selecionadas) < limit:
-        vistos = set(id(q) for q in selecionadas)
-        for q in questoes:
-            if id(q) not in vistos:
-                selecionadas.append(q)
-            if len(selecionadas) >= limit:
-                break
-
-    log.info(f"_selecionar_por_llm → {len(selecionadas)} questões selecionadas para '{topic}'")
-    return selecionadas
-
-
 def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
     """
-    Busca questões relacionadas a um tema nos anos 2022 e 2023.
+    Busca questões dos anos 2021-2023 filtrando por disciplina e keyword.
+    Zero chamadas LLM.
 
     Fluxo:
-    1. Coleta até 20 questões brutas dos anos 2022 e 2023
-    2. Usa LLM para selecionar as `limit` mais relevantes ao tema
-    3. A heurística de complexidade classifica as selecionadas
-
-    Retorna até `limit` questões.
+    1. Resolve disciplina e keywords do tema via TEMA_DISCIPLINA / _KEYWORDS_TEMA
+    2. Busca a partir do offset correto da disciplina (evita varrer blocos errados)
+    3. Para ao acumular 10 questões da disciplina que contenham keyword do tema
+    4. Retorna as brutas para classificar_top3() no caller
     """
-    exames = get_exams()
-    if not exames:
-        log.warning("get_exams() retornou vazio")
-        return []
+    _ANOS = [2023, 2022, 2021]
+    topic_lower = topic.lower().strip()
 
-    _ANOS_PERMITIDOS = {2022, 2023}
-    anos = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
-    log.info(f"search_questions_by_topic('{topic}') | anos: {anos}")
+    # Resolve disciplina
+    disciplina = TEMA_DISCIPLINA.get(topic_lower)
+    offset_ini = _OFFSET_DISCIPLINA.get(disciplina, 0) if disciplina else 0
 
-    brutas = []
-    budget = limit * 2  # coleta até 2× o limite para dar opção ao LLM
+    # Resolve keywords: mapa fixo + palavras longas do próprio tema
+    keywords = list(_KEYWORDS_TEMA.get(topic_lower, []))
+    keywords += [p.lower() for p in topic_lower.split() if len(p) > 4]
+    keywords = list(dict.fromkeys(keywords))  # deduplicar mantendo ordem
 
-    for ano in anos:
-        if len(brutas) >= budget:
+    log.info(
+        f"search_questions_by_topic('{topic}') | disciplina={disciplina} "
+        f"offset_ini={offset_ini} | keywords={keywords[:5]}"
+    )
+
+    _META   = 10
+    encontradas: list[dict] = []
+
+    for ano in _ANOS:
+        if len(encontradas) >= _META:
             break
-        try:
-            todas_do_ano = _buscar_paginas(ano, max_questoes=15)
-            brutas.extend(todas_do_ano)
-            log.info(f"  Coletadas {len(todas_do_ano)} brutas do ano {ano}")
-        except Exception as e:
-            log.warning(f"  Erro ao processar ano {ano}: {e}")
-            continue
+        offset = offset_ini
+        while len(encontradas) < _META:
+            try:
+                dados = _get(f"/exams/{ano}/questions", params={"limit": 45, "offset": offset})
+            except Exception as e:
+                log.warning(f"  Erro ano={ano} offset={offset}: {e}")
+                break
 
-    brutas = brutas[:budget]  # garante no máximo 20
+            if not dados:
+                break
 
-    # Remove questões de língua estrangeira da busca geral
-    brutas = [q for q in brutas if not _detectar_idioma_estrangeiro(q)]
+            questoes_pagina = dados.get("questions", [])
+            if not questoes_pagina:
+                break
 
-    if not brutas:
-        log.warning(f"Nenhuma questão coletada para '{topic}'.")
-        return []
+            for q in questoes_pagina:
+                # Filtra idioma estrangeiro
+                if (q.get("language") or ""):
+                    continue
+                # Filtra disciplina (client-side, pois filtro da API não funciona)
+                if disciplina and q.get("discipline") != disciplina:
+                    continue
+                qf = _formatar_questao(q, ano=ano)
+                # Filtra por keyword no texto
+                texto = " ".join([
+                    (qf.get("contexto") or ""),
+                    (qf.get("enunciado") or ""),
+                ]).lower()
+                if keywords and not any(kw in texto for kw in keywords):
+                    continue
+                encontradas.append(qf)
+                if len(encontradas) >= _META:
+                    break
 
-    # Filtra pelo LLM e retorna as mais relevantes
-    return _selecionar_por_llm(topic, brutas, limit=limit)
+            meta = dados.get("metadata", {})
+            if not meta.get("hasMore", False):
+                break
+            offset += 45
+
+        log.info(f"  ano={ano} → {len(encontradas)} questões acumuladas para '{topic}'")
+
+    log.info(f"  Total: {len(encontradas)} questões para '{topic}'")
+    return encontradas
 
 
 def get_questions_by_difficulty(topic: str, discipline: str = None) -> dict:
