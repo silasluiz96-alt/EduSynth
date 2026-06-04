@@ -11,6 +11,7 @@ CORREÇÕES aplicadas:
 """
 
 import os
+import re
 import sys
 import json
 import random
@@ -31,6 +32,23 @@ DISCIPLINES = {
     "ciencias-natureza": "Ciências da Natureza e suas Tecnologias",
     "linguagens":        "Linguagens, Códigos e suas Tecnologias",
     "matematica":        "Matemática e suas Tecnologias",
+}
+
+# Slugs de disciplina de língua estrangeira na API enem.dev
+_DISCIPLINE_SLUGS_IDIOMA = {
+    "ingles", "espanhol", "lingua-estrangeira",
+    "ingles-ingles", "espanhol-espanhol", "foreign-language",
+}
+
+# Stopwords comuns em português para heurística de idioma
+# Se o texto tiver menos de 12% dessas palavras, provavelmente não é PT
+_STOPWORDS_PT = {
+    "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas",
+    "a", "o", "as", "os", "e", "que", "um", "uma", "com", "para",
+    "por", "se", "não", "mas", "são", "foi", "esta", "este", "como",
+    "mais", "também", "ou", "seu", "sua", "seus", "suas", "pelo", "pela",
+    "ao", "aos", "às", "há", "ser", "ter", "ele", "ela", "eles", "elas",
+    "eu", "tu", "nós", "vós", "me", "te", "lhe", "nos", "já", "quando",
 }
 
 # Mapa de termos expandidos para busca por tema
@@ -56,6 +74,43 @@ _EXPANSAO_TEMAS = {
     "interpretação de texto":        ["interpretacao", "inferencia", "compreensao", "leitura", "enunciado"],
     "figuras de linguagem":          ["figura de linguagem", "metafora", "metonimia", "ironia", "hiperbole"],
 }
+
+
+# ── Detecção de idioma estrangeiro ────────────────────────────────────────────
+
+def _detectar_idioma_estrangeiro(questao: dict) -> bool:
+    """
+    Retorna True se a questão é de língua estrangeira (inglês ou espanhol).
+
+    Critérios (qualquer um suficiente):
+    1. Campo discipline_slug contém slug de idioma estrangeiro
+    2. Texto contém ¿ ou ¡ (marcadores espanhóis)
+    3. Contexto tem menos de 12% de stopwords PT → provavelmente idioma estrangeiro
+    """
+    # Critério 1: slug da disciplina
+    disc = (questao.get("disciplina_slug", "") or "").lower().replace(" ", "-")
+    if any(slug in disc for slug in _DISCIPLINE_SLUGS_IDIOMA):
+        return True
+
+    texto_completo = " ".join([
+        questao.get("contexto", "") or "",
+        questao.get("enunciado", "") or "",
+    ])
+
+    # Critério 2: caracteres exclusivos do espanhol
+    if "¿" in texto_completo or "¡" in texto_completo:
+        return True
+
+    # Critério 3: proporção baixa de stopwords portuguesas no contexto
+    contexto = questao.get("contexto", "") or ""
+    if len(contexto) > 80:
+        palavras = re.sub(r"[^\w\s]", "", contexto.lower()).split()
+        if palavras:
+            pt_ratio = sum(1 for p in palavras if p in _STOPWORDS_PT) / len(palavras)
+            if pt_ratio < 0.12:
+                return True
+
+    return False
 
 
 # ── Helpers internos ──────────────────────────────────────────────────────────
@@ -349,6 +404,9 @@ def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
 
     brutas = brutas[:budget]  # garante no máximo 20
 
+    # Remove questões de língua estrangeira da busca geral
+    brutas = [q for q in brutas if not _detectar_idioma_estrangeiro(q)]
+
     if not brutas:
         log.warning(f"Nenhuma questão coletada para '{topic}'.")
         return []
@@ -436,6 +494,68 @@ def get_questions_by_difficulty(topic: str, discipline: str = None) -> dict:
         "total_analisadas": len(classificadas),
         "erro":             None,
     }
+
+
+def search_language_questions(language: str, limit: int = 10) -> list[dict]:
+    """
+    Busca questões de língua estrangeira dos anos 2022-2023.
+
+    language: "ingles" ou "espanhol"
+
+    Fluxo:
+    1. Coleta questões brutas via _buscar_paginas
+    2. Filtra APENAS as detectadas como idioma estrangeiro por _detectar_idioma_estrangeiro
+    3. Aplica filtro de idioma específico (¿/¡ para espanhol, ausência deles para inglês)
+    4. Classifica pela heurística e retorna até limit questões
+    """
+    exames = get_exams()
+    if not exames:
+        log.warning("search_language_questions: get_exams() retornou vazio")
+        return []
+
+    _ANOS_PERMITIDOS = {2022, 2023}
+    anos = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
+    log.info(f"search_language_questions('{language}') | anos: {anos}")
+
+    brutas = []
+    for ano in anos:
+        try:
+            questoes_ano = _buscar_paginas(ano, max_questoes=15)
+            brutas.extend(questoes_ano)
+            log.info(f"  {len(questoes_ano)} questões coletadas do ano {ano}")
+        except Exception as e:
+            log.warning(f"  Erro ao buscar ano {ano}: {e}")
+
+    # Mantém apenas questões de idioma estrangeiro
+    idioma_questoes = [q for q in brutas if _detectar_idioma_estrangeiro(q)]
+    log.info(f"  {len(idioma_questoes)} questões de idioma detectadas (total brutas: {len(brutas)})")
+
+    # Refina por idioma específico
+    if language == "espanhol":
+        def _eh_espanhol(q):
+            txt = " ".join([q.get("contexto", "") or "", q.get("enunciado", "") or ""])
+            return "¿" in txt or "¡" in txt
+        idioma_questoes = [q for q in idioma_questoes if _eh_espanhol(q)]
+    elif language == "ingles":
+        def _eh_ingles(q):
+            txt = " ".join([q.get("contexto", "") or "", q.get("enunciado", "") or ""])
+            return "¿" not in txt and "¡" not in txt
+        idioma_questoes = [q for q in idioma_questoes if _eh_ingles(q)]
+
+    log.info(f"  {len(idioma_questoes)} questões de {language} após filtro específico")
+
+    if not idioma_questoes:
+        log.warning(f"Nenhuma questão de {language} encontrada nos anos {anos}.")
+        return []
+
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+        from agents.complexity_ranker import classificar_lote
+        classificadas = classificar_lote(idioma_questoes)
+    except Exception:
+        classificadas = idioma_questoes
+
+    return classificadas[:limit]
 
 
 # ── Teste local ───────────────────────────────────────────────────────────────

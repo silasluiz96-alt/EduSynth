@@ -394,6 +394,9 @@ def _init_state():
         "baloes_temas":     [],
         "baloes_ts":        0.0,
         "balao_clicado":    False,
+        # Botões de idioma
+        "lang_clicada":     "",   # "ingles" ou "espanhol"
+        "modo_idioma":      "",   # persiste durante o pipeline
         # Timer UI
         "timer_visivel":    False,
         "meta_atingida":    False,
@@ -742,6 +745,51 @@ if st.session_state["timer_visivel"]:
 
 st.markdown('<hr class="neon-divider">', unsafe_allow_html=True)
 
+# ── Botões de Língua Estrangeira ──────────────────────────────────────────────
+st.markdown("""
+<style>
+  /* Botões de idioma — borda dourada */
+  div[data-testid="stHorizontalBlock"] div[data-testid="column"]:nth-child(-n+2)
+    > div > div > div > button.lang-idioma {
+    border-color: #ffc800 !important;
+    color: #ffc800 !important;
+  }
+  .lang-title { color:#888; font-size:.78rem; margin-bottom:.25rem; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<p class="lang-title">🌍 Língua Estrangeira ENEM — botões dedicados:</p>', unsafe_allow_html=True)
+
+_carregando_agora = st.session_state.get("carregando", False)
+_col_en, _col_es, _col_lang_spacer = st.columns([1, 1, 5])
+
+with _col_en:
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"]:has(.lang-gold) button {
+        border: 1.5px solid #ffc800 !important;
+        color: #ffc800 !important;
+        background: rgba(255,200,0,.06) !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.lang-gold) button:hover {
+        box-shadow: 0 0 12px rgba(255,200,0,.35) !important;
+    }
+    </style>
+    <span class="lang-gold" style="display:none"></span>
+    """, unsafe_allow_html=True)
+    if st.button("🇬🇧 Inglês", key="btn_lang_ingles", use_container_width=True, disabled=_carregando_agora):
+        st.session_state["lang_clicada"] = "ingles"
+        st.session_state["tema_input"]   = "Inglês ENEM"
+        st.rerun()
+
+with _col_es:
+    if st.button("🇪🇸 Espanhol", key="btn_lang_espanhol", use_container_width=True, disabled=_carregando_agora):
+        st.session_state["lang_clicada"] = "espanhol"
+        st.session_state["tema_input"]   = "Espanhol ENEM"
+        st.rerun()
+
+st.markdown('<hr class="neon-divider">', unsafe_allow_html=True)
+
 # ── Balões de temas interativos ───────────────────────────────────────────────
 import random as _random
 
@@ -860,7 +908,7 @@ if _esta_carregando:
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 
-def _iniciar_tema(tema: str):
+def _iniciar_tema(tema: str, modo_idioma: str = ""):
     """
     Passo 1: limpa todo o conteúdo anterior e sinaliza 'limpando'.
     O rerun seguinte mostra a tela com balões (estado zerado).
@@ -870,6 +918,7 @@ def _iniciar_tema(tema: str):
         "resultado_atual":  None,
         "tema_input":       tema,
         "tema_pendente":    tema,
+        "modo_idioma":      modo_idioma,
         "limpando":         True,
         "carregando":       False,
         # Questão
@@ -881,14 +930,25 @@ def _iniciar_tema(tema: str):
     })
     st.rerun()
 
+# Língua clicada
+if st.session_state.get("lang_clicada") and st.session_state["tema_input"]:
+    _modo = st.session_state["lang_clicada"]
+    st.session_state["lang_clicada"] = ""
+    _iniciar_tema(st.session_state["tema_input"], modo_idioma=_modo)
+
 # Balão clicado
 if st.session_state.get("balao_clicado") and st.session_state["tema_input"]:
     st.session_state["balao_clicado"] = False
     _iniciar_tema(st.session_state["tema_input"])
 
-# Botão "Estudar Agora"
+# Botão "Estudar Agora" — com detecção de idioma no campo de texto
+_TERMOS_IDIOMA_INPUT = {"inglês", "ingles", "english", "espanhol", "spanish", "español"}
 if iniciar and tema_digitado.strip():
-    _iniciar_tema(tema_digitado.strip())
+    _t_lower = tema_digitado.strip().lower()
+    if any(t in _t_lower for t in _TERMOS_IDIOMA_INPUT):
+        st.warning("Para estudar Inglês ou Espanhol, use os botões dedicados acima 👆")
+    else:
+        _iniciar_tema(tema_digitado.strip())
 
 # Passo 2: tela já está limpa → agora ativa o carregamento
 if st.session_state.get("limpando") and st.session_state.get("tema_pendente"):
@@ -968,11 +1028,15 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
 
         _show("🏆 ENEM API + Ranqueador", "Classificando as questões por dificuldade...", 3)
         _t = pre_agent_hook("ENEM API + Ranqueador")
+        _modo_idioma_pipeline = st.session_state.get("modo_idioma", "")
         try:
-            from agents.enem_api          import search_questions_by_topic
+            from agents.enem_api          import search_questions_by_topic, search_language_questions
             from agents.complexity_ranker import classificar_top3
 
-            questoes_reais = search_questions_by_topic(tema, limit=15)
+            if _modo_idioma_pipeline:
+                questoes_reais = search_language_questions(_modo_idioma_pipeline, limit=15)
+            else:
+                questoes_reais = search_questions_by_topic(tema, limit=15)
             if questoes_reais:
                 top3 = classificar_top3(questoes_reais)
                 fila = [top3[c] for c in ("facil", "medio", "dificil") if top3.get(c)]

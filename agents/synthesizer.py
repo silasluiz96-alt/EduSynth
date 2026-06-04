@@ -106,6 +106,70 @@ def _serializar_desempenho(r: dict) -> str:
     return "\n".join(partes)
 
 
+def _detectar_modo_idioma(tema: str) -> str:
+    """Retorna 'ingles', 'espanhol' ou '' se o tema for de língua estrangeira ENEM."""
+    t = tema.lower().strip()
+    if any(k in t for k in ("inglês", "ingles", "english", "língua inglesa")):
+        return "ingles"
+    if any(k in t for k in ("espanhol", "español", "spanish", "língua espanhola")):
+        return "espanhol"
+    return ""
+
+
+def _montar_prompt_idioma(idioma: str) -> str:
+    """Prompt especializado para material de língua estrangeira ENEM."""
+    nome = "Inglês" if idioma == "ingles" else "Espanhol"
+    return f"""Gere material de estudo sobre "{nome} no ENEM" com foco em técnicas de prova.
+Responda APENAS com JSON válido, sem texto antes ou depois, sem markdown, sem backticks.
+
+JSON esperado:
+
+{{
+  "introducao": "2 parágrafos: como o ENEM avalia {nome} (interpretação, não tradução) e o que o estudante precisa saber para se sair bem",
+
+  "pontos_essenciais": [
+    {{"conceito": "nome da técnica", "definicao": "1 frase", "exemplo": "exemplo prático aplicado ao ENEM", "cobrado_enem": true}}
+  ],
+
+  "conexoes_interdisciplinares": [
+    {{"disciplina": "nome", "como_se_conecta": "1 frase", "exemplo_enem": "1 frase"}}
+  ],
+
+  "questao_enem": {{
+    "texto_apoio": "texto de apoio curto simulando questão real de {nome} no ENEM (2-4 linhas no idioma estrangeiro)",
+    "enunciado": "enunciado em português com comando explícito",
+    "alternativas": {{
+      "A": "alternativa A",
+      "B": "alternativa B",
+      "C": "alternativa C",
+      "D": "alternativa D",
+      "E": "alternativa E"
+    }},
+    "gabarito_interno": "letra correta (A-E)"
+  }},
+
+  "analise_palavras_chave": {{
+    "no_enunciado": {{"comando": "o que a questão pede"}},
+    "nas_alternativas": {{"marcadores_correto": "o que marca a correta"}}
+  }},
+
+  "dicas_de_prova": ["dica 1", "dica 2", "dica 3"],
+
+  "leituras_recomendadas": {{
+    "indicacoes": [{{"tipo": "tipo", "titulo": "título", "onde_encontrar": "onde"}}],
+    "palavras_chave_scholar": ["termo1", "termo2"]
+  }}
+}}
+
+REGRAS OBRIGATÓRIAS para {nome}:
+- introducao: deixe claro que o ENEM NÃO cobra tradução — cobra interpretação e contexto
+- pontos_essenciais DEVE ter exatamente 5 itens cobrindo: (1) leitura sem tradução completa, (2) identificação de palavras-chave pelo contexto, (3) falsos cognatos mais cobrados no ENEM, (4) como o enunciado em português guia a resposta, (5) técnica de eliminação específica para questões de idioma
+- dicas_de_prova: 3 dicas específicas e práticas para questões de {nome}
+- Todo o material em português brasileiro — apenas o texto_apoio da questão deve estar no idioma estrangeiro
+- gabarito_interno é uso interno — não exibir ao estudante
+LIMITES: pontos_essenciais=5 itens, conexoes=2 itens, dicas=3 itens, leituras=2 itens."""
+
+
 def _montar_prompt(tema: str, pesquisa: str, critica: str, desempenho: str) -> str:
     return f"""Gere material de estudo sobre "{tema}" com base nos inputs abaixo.
 Responda APENAS com JSON válido, sem texto antes ou depois, sem markdown, sem backticks.
@@ -186,11 +250,14 @@ def sintetizar(
     tema = resultado_pesquisa.get("tema", "")
     skill = _carregar_skill()
 
-    pesquisa_txt = _serializar_pesquisa(resultado_pesquisa)
-    critica_txt = _serializar_critica(resultado_critica)
-    desempenho_txt = _serializar_desempenho(snapshot_desempenho or {})
-
-    prompt = _montar_prompt(tema, pesquisa_txt, critica_txt, desempenho_txt)
+    modo_idioma = _detectar_modo_idioma(tema)
+    if modo_idioma:
+        prompt = _montar_prompt_idioma(modo_idioma)
+    else:
+        pesquisa_txt = _serializar_pesquisa(resultado_pesquisa)
+        critica_txt = _serializar_critica(resultado_critica)
+        desempenho_txt = _serializar_desempenho(snapshot_desempenho or {})
+        prompt = _montar_prompt(tema, pesquisa_txt, critica_txt, desempenho_txt)
 
     r = chamar_llm(prompt=prompt, system_prompt=skill, max_tokens=3500)
     if r["erro"]:
