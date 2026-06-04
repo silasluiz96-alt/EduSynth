@@ -264,9 +264,11 @@ def _selecionar_por_llm(topic: str, questoes: list[dict], limit: int = 10) -> li
         lista_txt += f"{i}. [{q.get('ano')}] {enunciado}\n"
 
     prompt = (
-        f"Dado o tema '{topic}', selecione as {limit} questões mais relevantes "
-        f"da lista abaixo.\n"
-        f"Retorne apenas os índices em JSON: {{\"indices\": [0, 3, 7, ...]}}\n\n"
+        f"Você é um especialista em ENEM. Dado o tema '{topic}', selecione APENAS "
+        f"as questões que tratam DIRETAMENTE desse tema. Ignore questões que apenas "
+        f"mencionam o tema superficialmente.\n"
+        f"Retorne apenas os índices em JSON: {{\"indices\": [0, 3, 7]}}.\n"
+        f"Se nenhuma questão for relevante, retorne {{\"indices\": []}}.\n\n"
         f"{lista_txt}"
     )
 

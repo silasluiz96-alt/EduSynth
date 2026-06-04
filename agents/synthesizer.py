@@ -107,7 +107,8 @@ def _serializar_desempenho(r: dict) -> str:
 
 
 def _montar_prompt(tema: str, pesquisa: str, critica: str, desempenho: str) -> str:
-    return f"""Gere material de estudo sobre "{tema}" com base nos inputs abaixo. Retorne APENAS JSON válido.
+    return f"""Gere material de estudo sobre "{tema}" com base nos inputs abaixo.
+Responda APENAS com JSON válido, sem texto antes ou depois, sem markdown, sem backticks.
 
 PESQUISADOR: {pesquisa}
 CRÍTICO: {critica}

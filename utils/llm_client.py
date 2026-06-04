@@ -244,6 +244,56 @@ def parse_resposta_json(texto: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # Fallback: devolve o texto bruto para o agente exibir
-    log.warning("parse_resposta_json: nenhum JSON válido encontrado — retornando fallback.")
+    # Fallback: tenta extrair campos principais do Sintetizador via regex
+    log.warning("parse_resposta_json: JSON inválido — tentando extração por regex.")
+    extraido = _extrair_campos_regex(t)
+    if extraido:
+        return extraido
+
+    # Último recurso: devolve o texto bruto para o agente exibir
+    log.warning("parse_resposta_json: extração regex falhou — retornando texto bruto.")
     return {"content": texto}
+
+
+def _extrair_campos_regex(texto: str) -> dict:
+    """
+    Tenta extrair campos principais do Sintetizador quando o JSON está malformado.
+    Procura por padrões como "introducao": "..." ou "introducao": [...]
+    Retorna dict com os campos encontrados, ou {} se nada for extraído.
+    """
+    resultado = {}
+
+    # introducao — string entre aspas após a chave
+    m = re.search(r'"introducao"\s*:\s*"([\s\S]{20,}?)"(?=\s*[,}])', texto)
+    if m:
+        resultado["introducao"] = m.group(1).replace('\\"', '"')
+
+    # dicas_de_prova — array de strings
+    m = re.search(r'"dicas_de_prova"\s*:\s*\[([\s\S]*?)\]', texto)
+    if m:
+        dicas_raw = re.findall(r'"(.*?)"', m.group(1))
+        if dicas_raw:
+            resultado["dicas_de_prova"] = dicas_raw
+
+    # pontos_essenciais — array de objetos (extrai apenas conceito+definicao)
+    m = re.search(r'"pontos_essenciais"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])', texto)
+    if m:
+        pontos = []
+        for bloco in re.finditer(r'\{([^{}]+)\}', m.group(1)):
+            p = {}
+            cm = re.search(r'"conceito"\s*:\s*"([^"]+)"', bloco.group(1))
+            dm = re.search(r'"definicao"\s*:\s*"([^"]+)"', bloco.group(1))
+            em = re.search(r'"exemplo"\s*:\s*"([^"]+)"', bloco.group(1))
+            if cm:
+                p["conceito"] = cm.group(1)
+            if dm:
+                p["definicao"] = dm.group(1)
+            if em:
+                p["exemplo"] = em.group(1)
+            p["cobrado_enem"] = True
+            if p.get("conceito"):
+                pontos.append(p)
+        if pontos:
+            resultado["pontos_essenciais"] = pontos
+
+    return resultado
