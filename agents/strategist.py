@@ -80,8 +80,10 @@ def _formatar_questao(questao: dict) -> str:
     """Serializa o dicionário da questão em texto legível para o prompt."""
     partes = []
 
-    if questao.get("texto_apoio"):
-        partes.append(f"TEXTO DE APOIO:\n{questao['texto_apoio']}")
+    # Questões da API enem.dev usam "contexto"; questões de IA usam "texto_apoio"
+    texto_apoio = questao.get("contexto") or questao.get("texto_apoio", "")
+    if texto_apoio:
+        partes.append(f"TEXTO DE APOIO:\n{texto_apoio}")
 
     if questao.get("enunciado"):
         partes.append(f"ENUNCIADO:\n{questao['enunciado']}")

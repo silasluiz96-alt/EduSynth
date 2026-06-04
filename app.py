@@ -1271,7 +1271,6 @@ if st.session_state["resultado_atual"]:
 
                             if letra == gabarito_correto_q:
                                 st.session_state["resposta_correta"] = True
-                                edu._analista.register_hint(res["tema"], nivel_dica)
                                 st.rerun()
                             else:
                                 proximo = nivel_dica + 1

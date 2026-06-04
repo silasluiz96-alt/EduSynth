@@ -176,6 +176,7 @@ Responda APENAS com JSON válido, sem texto antes ou depois, sem markdown, sem b
 
 PESQUISADOR: {pesquisa}
 CRÍTICO: {critica}
+DESEMPENHO DO ESTUDANTE: {desempenho}
 
 JSON esperado (seja conciso — respeite os limites indicados):
 

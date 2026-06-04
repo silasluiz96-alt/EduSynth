@@ -19,6 +19,11 @@ import logging
 from dotenv import load_dotenv
 import requests
 
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="[enem_api] %(message)s")
@@ -245,23 +250,6 @@ def _buscar_paginas(ano: int, discipline: str = None, max_questoes: int = 200) -
     return todas
 
 
-def _termos_busca(topic: str) -> list[str]:
-    """Retorna lista de termos para busca: o próprio topic + expansões."""
-    topic_lower = topic.lower().strip()
-    termos = [topic_lower]
-
-    # Expansão direta
-    for chave, sinonimos in _EXPANSAO_TEMAS.items():
-        if chave in topic_lower or topic_lower in chave:
-            termos.extend(sinonimos)
-            break
-
-    # Palavras do próprio tema (para temas compostos)
-    palavras = [p for p in topic_lower.split() if len(p) > 4]
-    termos.extend(palavras)
-
-    return list(dict.fromkeys(termos))  # remove duplicatas mantendo ordem
-
 
 def _questao_contem_tema(q: dict, termos: list[str]) -> bool:
     """Verifica se algum dos termos aparece no texto completo da questão."""
@@ -429,11 +417,11 @@ def get_questions_by_difficulty(topic: str, discipline: str = None) -> dict:
         }
 
     api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
+    if not api_key or Groq is None:
         return {
             "facil": None, "media": None, "dificil": None,
             "total_analisadas": 0,
-            "erro": "GROQ_API_KEY não encontrada.",
+            "erro": "GROQ_API_KEY não encontrada ou biblioteca groq não instalada.",
         }
 
     client = Groq(api_key=api_key)

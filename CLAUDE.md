@@ -309,6 +309,28 @@ Linguagens: Modernismo Brasileiro, Interpretação de Texto, Figuras de Linguage
 
 ---
 
+## Sessão 6 — 04/06/2026
+
+### Diagnóstico e correções aplicadas
+- synthesizer.py: `desempenho_txt` agora é incluído no prompt (era calculado mas nunca enviado ao LLM)
+- app.py: removido `register_hint` chamado ao acertar — métricas de desempenho não são mais distorcidas
+- enem_api.py: importação de `Groq` adicionada com `try/except`; `_termos_busca` (função morta com NameError latente) removida
+- enem_api.py: `get_questions_by_difficulty` agora verifica `Groq is None` antes de instanciar
+- strategist.py: `_formatar_questao` agora lê `contexto` (questões reais) ou `texto_apoio` (questões IA) — Estrategista recebia contexto vazio para questões da enem.dev
+- llm_client.py: ordem restaurada para Gemini → Groq (alinhada com CLAUDE.md; código estava invertido desde testes)
+
+### Estado atual
+- Deploy: https://knowsynth.streamlit.app/
+- Repositório: https://github.com/silasluiz96-alt/KnowSynth
+- Pasta local: C:\Users\silas\OneDrive\Desktop\knowsynth
+
+### Próxima sessão — prioridades
+1. Testar fluxo completo end-to-end com as correções
+2. Commit e push das correções
+3. Continuar roadmap de melhorias
+
+---
+
 ## Sessão 5 — 04/06/2026 (tarde)
 
 ### Estado atual

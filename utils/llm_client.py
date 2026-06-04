@@ -166,10 +166,7 @@ def chamar_llm(
     max_tokens: int = 1500,
 ) -> dict:
     """
-    Chama o melhor LLM disponível: Groq primeiro, Gemini como fallback.
-
-    Ordem invertida para respeitar o limite de 20 req/min do Gemini.
-    Groq tem limites mais generosos e latência menor.
+    Chama o melhor LLM disponível: Gemini primeiro, Groq como fallback.
 
     Parâmetros:
         prompt        — mensagem principal do usuário
@@ -190,7 +187,7 @@ def chamar_llm(
     if resultado and resultado.get("texto"):
         return resultado
 
-    log.error("Gemini e Groq falharam — retornando mensagem de indisponibilidade.")
+    log.error("Groq e Gemini falharam — retornando mensagem de indisponibilidade.")
     return {
         "texto":         "",
         "tokens_usados": 0,
