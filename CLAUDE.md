@@ -271,3 +271,39 @@ python -m streamlit run app.py
 - GROQ_API_KEY: configurada no .env e Streamlit Secrets
 - TAVILY_API_KEY: configurada no .env e Streamlit Secrets
 
+---
+
+## Sessão 4 — 04/06/2026
+
+### Estado atual
+- Deploy funcionando: https://knowsynth.streamlit.app/
+- Repositório: https://github.com/silasluiz96-alt/KnowSynth
+- Pasta local: C:\Users\silas\OneDrive\Desktop\knowsynth
+
+### Melhorias implementadas nessa sessão
+- Ranqueador de complexidade refatorado para heurística local (zero chamadas LLM)
+- ENEM API limitada a 2 anos (2022-2023) e 10 questões máximo
+- LLM adicionado para seleção semântica de questões relevantes
+- Modelo trocado para gemini-2.5-flash-lite (1000 RPD no free tier)
+- Fallback: Groq llama-3.3-70b-versatile
+- 15 temas principais definidos nos balões de sugestão
+- Rotação dos balões reduzida para 10 minutos
+
+### Problemas pendentes
+- parse_resposta_json no Sintetizador retorna fallback — material didático aparece vazio
+- Questões da enem.dev às vezes irrelevantes para o tema (seleção LLM melhorada mas ainda imprecisa)
+- Correção pendente: synthesizer.py deve instruir LLM a retornar JSON puro sem markdown
+- Correção pendente: parse_resposta_json deve tentar extrair campos via regex como fallback
+
+### 15 temas principais definidos
+Humanas: Revolução Industrial, Segunda Guerra Mundial, Ditadura Militar Brasileira, Globalização
+Natureza: Aquecimento Global, Fotossíntese, Genética Mendeliana, Leis de Newton
+Matemática: Funções do 1º e 2º Grau, Progressão Aritmética, Probabilidade, Geometria Plana
+Linguagens: Modernismo Brasileiro, Interpretação de Texto, Figuras de Linguagem
+
+### Próxima sessão — prioridades
+1. Corrigir JSON do Sintetizador (material didático vazio)
+2. Testar fluxo completo end-to-end
+3. Commit e push das correções pendentes
+4. Continuar roadmap de melhorias
+
