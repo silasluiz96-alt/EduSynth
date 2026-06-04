@@ -307,3 +307,44 @@ Linguagens: Modernismo Brasileiro, Interpretação de Texto, Figuras de Linguage
 3. Commit e push das correções pendentes
 4. Continuar roadmap de melhorias
 
+---
+
+## Sessão 5 — 04/06/2026 (tarde)
+
+### Estado atual
+- Deploy: https://knowsynth.streamlit.app/
+- Repositório: https://github.com/silasluiz96-alt/KnowSynth
+- Pasta local: C:\Users\silas\OneDrive\Desktop\knowsynth
+
+### Descobertas críticas sobre a enem.dev API
+- Campo "language" existe e é confiável para filtrar inglês/espanhol
+- Filtros via query parameter (?discipline=, ?search=) são ignorados silenciosamente
+- Questões vêm em blocos sequenciais por disciplina:
+  linguagens=offset 0, humanas=offset 43, natureza=offset 90, matematica=offset 135
+- Banco total: 2009-2023, ~183-185 questões por ano
+- Estrutura real: {"metadata": {...}, "questions": [...]}
+
+### Arquitetura atual da busca ENEM
+- TEMA_DISCIPLINA: mapa dos 15 temas para suas disciplinas
+- TEMA_KEYWORDS: keywords ampliadas por tema (implementado nessa sessão)
+- Offset inicial por disciplina para evitar varredura desnecessária
+- Anos: 2021, 2022, 2023
+- Zero chamadas LLM na seleção — filtro local por keyword
+- Heurística local para classificação fácil/médio/difícil (zero LLM)
+
+### LLM atual
+- Principal: Gemini 2.5 Flash-Lite (20 req/dia free tier — esgota rápido em testes)
+- Fallback: Groq llama-3.3-70b-versatile (100k tokens/dia)
+- Gemini permanece como principal — não alterar essa ordem
+
+### Problemas pendentes
+- Fotossíntese encontrou apenas 1 questão em 3 anos — keywords ampliadas devem resolver
+- search_language_questions para inglês retorna 0 questões — campo language pode ter valor diferente
+- Questões de idioma (inglês/espanhol) usam campo language da API diretamente
+- Botões en-Inglês e es-Espanhol implementados e centralizados na interface
+
+### Próxima sessão — prioridades
+1. Testar busca com keywords ampliadas para Fotossíntese e outros temas
+2. Investigar campo language para questões de inglês (debug já feito para espanhol)
+3. Testar fluxo completo end-to-end no Streamlit Cloud
+4. Continuar roadmap de melhorias
