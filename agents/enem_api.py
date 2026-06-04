@@ -494,39 +494,57 @@ def get_questions_by_difficulty(topic: str, discipline: str = None) -> dict:
 
 def search_language_questions(language: str) -> list[dict]:
     """
-    Busca até 6 questões de língua estrangeira dos anos 2022-2023.
+    Busca até 6 questões de língua estrangeira dos anos 2021-2023.
 
     language: "ingles" ou "espanhol"
 
-    Retorna as questões brutas (sem classificar) para que o chamador
-    passe por classificar_top3(), igual ao fluxo de search_questions_by_topic.
+    Estratégia por idioma:
+    - espanhol: filtra pelo campo language='espanhol' da API (confiável)
+    - ingles: a API nunca retorna language='ingles' — usa heurística de
+      palavras-gatilho em questões de linguagens com language=null
     """
-    exames = get_exams()
-    if not exames:
-        log.warning("search_language_questions: get_exams() retornou vazio")
-        return []
-
-    _ANOS_PERMITIDOS = {2022, 2023}
-    anos = sorted([e["ano"] for e in exames if e["ano"] in _ANOS_PERMITIDOS], reverse=True)
-    log.info(f"search_language_questions('{language}') | anos: {anos}")
+    _ANOS = [2023, 2022, 2021]
+    log.info(f"search_language_questions('{language}') | anos: {_ANOS}")
 
     questoes: list[dict] = []
 
-    for ano in anos:
+    for ano in _ANOS:
         if len(questoes) >= 6:
             break
+        # Questões de idioma ficam no início da prova (offset 0 já cobre)
         try:
             dados = _get(f"/exams/{ano}/questions", params={"limit": 45, "offset": 0})
-            if not dados:
-                continue
-            for q in dados.get("questions", []):
-                if (q.get("language") or "").lower().strip() == language:
-                    questoes.append(_formatar_questao(q, ano=ano))
-                    if len(questoes) >= 6:
-                        break
-            log.info(f"  ano={ano} → {len(questoes)} questões de {language} acumuladas")
         except Exception as e:
             log.warning(f"  Erro ao buscar ano {ano}: {e}")
+            continue
+
+        if not dados:
+            continue
+
+        for q in dados.get("questions", []):
+            lang_api = (q.get("language") or "").lower().strip()
+
+            if language == "espanhol":
+                # Campo language é confiável para espanhol
+                if lang_api != "espanhol":
+                    continue
+
+            elif language == "ingles":
+                # A API nunca marca language='ingles' — detecta por heurística
+                if lang_api:
+                    continue  # tem idioma marcado → é espanhol, pular
+                if q.get("discipline") != "linguagens":
+                    continue  # inglês sempre fica em linguagens
+                contexto = (q.get("context") or "").lower()
+                palavras = set(re.sub(r"[^\w\s]", "", contexto).split())
+                if sum(1 for p in _PALAVRAS_INGLES if p in palavras) < 3:
+                    continue  # não parece inglês
+
+            questoes.append(_formatar_questao(q, ano=ano))
+            if len(questoes) >= 6:
+                break
+
+        log.info(f"  ano={ano} → {len(questoes)} questões de {language} acumuladas")
 
     log.info(f"  Total: {len(questoes)} questões de {language}")
     return questoes
