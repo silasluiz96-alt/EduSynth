@@ -747,21 +747,13 @@ import random as _random
 
 _TODOS_TEMAS = [
     # Ciências Humanas
-    "Revolução Industrial", "Segunda Guerra Mundial", "Ditadura Militar Brasileira",
-    "Globalização", "Iluminismo", "Revolução Francesa", "Guerra Fria",
-    "Imperialismo Africano", "Redemocratização do Brasil", "Movimentos Sociais",
+    "Revolução Industrial", "Segunda Guerra Mundial", "Ditadura Militar Brasileira", "Globalização",
     # Ciências da Natureza
-    "Fotossíntese", "Genética Mendeliana", "Aquecimento Global", "Tabela Periódica",
-    "Leis de Newton", "Ondas Eletromagnéticas", "Ecossistemas", "Evolução das Espécies",
-    "Reações Químicas", "DNA e RNA",
+    "Aquecimento Global", "Fotossíntese", "Genética Mendeliana", "Leis de Newton",
     # Matemática
-    "Função Quadrática", "Progressão Aritmética", "Trigonometria", "Probabilidade",
-    "Geometria Espacial", "Porcentagem e Juros", "Equações do 2º Grau",
-    "Estatística Básica", "Matrizes e Determinantes", "Logaritmos",
+    "Funções do 1º e 2º Grau", "Progressão Aritmética", "Probabilidade", "Geometria Plana",
     # Linguagens
-    "Modernismo Brasileiro", "Romantismo", "Figuras de Linguagem",
-    "Interpretação de Texto", "Realismo e Naturalismo", "Literatura Africana",
-    "Variação Linguística", "Semiótica", "Vanguardas Europeias", "Gêneros Textuais",
+    "Modernismo Brasileiro", "Interpretação de Texto", "Figuras de Linguagem",
 ]
 
 _CORES_BALAO = [
@@ -772,12 +764,13 @@ _CORES_BALAO = [
     ("rgba(255,105,180,.08)","rgba(255,105,180,.5)","#ff69b4"),   # rosa
 ]
 
-_ROTACAO_SEG = 900  # 15 minutos
+_ROTACAO_SEG = 600  # 10 minutos
 
 def _atualizar_baloes():
-    """Sorteia 5 temas, evitando repetir os anteriores se possível."""
+    """Sorteia 5 temas diferentes dos 5 anteriores."""
     anteriores = set(st.session_state.get("baloes_temas", []))
     pool = [t for t in _TODOS_TEMAS if t not in anteriores]
+    # Com 15 temas e 5 anteriores, sempre haverá 10 disponíveis — sem precisar resetar
     if len(pool) < 5:
         pool = _TODOS_TEMAS
     novos = _random.sample(pool, 5)

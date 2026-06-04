@@ -36,16 +36,25 @@ DISCIPLINES = {
 # Mapa de termos expandidos para busca por tema
 # Quando o tema não for encontrado literalmente, tenta sinônimos relacionados
 _EXPANSAO_TEMAS = {
-    "fordismo":             ["ford", "linha de montagem", "producao em serie", "taylorismo"],
-    "toyotismo":            ["toyota", "just-in-time", "kanban", "producao flexivel"],
-    "globalização":         ["globalizacao", "neoliberal", "mercado global", "fmi"],
-    "fotossíntese":         ["fotossintese", "clorofila", "luz solar", "glicose"],
-    "genética mendeliana":  ["mendel", "hereditariedade", "dominante", "recessivo"],
-    "leis de newton":       ["newton", "inercia", "forcas", "movimento"],
-    "revolução industrial": ["revolucao industrial", "vapor", "industrializacao", "operario"],
-    "iluminismo":           ["iluminismo", "luzes", "razao", "voltaire", "rousseau"],
-    "aquecimento global":   ["aquecimento global", "efeito estufa", "clima", "carbono"],
-    "modernismo brasileiro":["modernismo", "semana de arte moderna", "1922"],
+    # Ciências Humanas
+    "revolução industrial":          ["revolucao industrial", "vapor", "industrializacao", "operario", "fabrica"],
+    "segunda guerra mundial":        ["segunda guerra", "nazismo", "holocausto", "aliados", "hitler"],
+    "ditadura militar brasileira":   ["ditadura militar", "golpe 64", "AI-5", "regime militar", "redemocratizacao"],
+    "globalização":                  ["globalizacao", "neoliberal", "mercado global", "fmi", "interdependencia"],
+    # Ciências da Natureza
+    "aquecimento global":            ["aquecimento global", "efeito estufa", "clima", "carbono", "mudancas climaticas"],
+    "fotossíntese":                  ["fotossintese", "clorofila", "luz solar", "glicose", "cloroplasto"],
+    "genética mendeliana":           ["mendel", "hereditariedade", "dominante", "recessivo", "gene"],
+    "leis de newton":                ["newton", "inercia", "forca", "movimento", "dinamica"],
+    # Matemática
+    "funções do 1º e 2º grau":       ["funcao", "funcoes", "parabola", "raiz", "coeficiente", "equacao"],
+    "progressão aritmética":         ["progressao aritmetica", "pa", "razao", "sequencia", "termo"],
+    "probabilidade":                 ["probabilidade", "evento", "espaco amostral", "combinatoria"],
+    "geometria plana":               ["geometria plana", "area", "perimetro", "triangulo", "circulo"],
+    # Linguagens
+    "modernismo brasileiro":         ["modernismo", "semana de arte moderna", "1922", "vanguarda"],
+    "interpretação de texto":        ["interpretacao", "inferencia", "compreensao", "leitura", "enunciado"],
+    "figuras de linguagem":          ["figura de linguagem", "metafora", "metonimia", "ironia", "hiperbole"],
 }
 
 
