@@ -748,47 +748,39 @@ st.markdown('<hr class="neon-divider">', unsafe_allow_html=True)
 # ── Botões de Língua Estrangeira ──────────────────────────────────────────────
 st.markdown("""
 <style>
-  /* Botões de idioma — borda dourada */
-  div[data-testid="stHorizontalBlock"] div[data-testid="column"]:nth-child(-n+2)
-    > div > div > div > button.lang-idioma {
-    border-color: #ffc800 !important;
+  .lang-header { text-align:center; color:#888; font-size:.78rem; margin-bottom:.5rem; }
+  /* Aplica borda dourada nos dois botões dentro do bloco de idioma */
+  div[data-testid="stHorizontalBlock"].lang-block button {
+    border: 1.5px solid #ffc800 !important;
     color: #ffc800 !important;
+    background: rgba(255,200,0,.05) !important;
   }
-  .lang-title { color:#888; font-size:.78rem; margin-bottom:.25rem; }
+  div[data-testid="stHorizontalBlock"].lang-block button:hover {
+    box-shadow: 0 0 14px rgba(255,200,0,.35) !important;
+    background: rgba(255,200,0,.10) !important;
+  }
+  .lang-sep { height:1px; background:linear-gradient(90deg,transparent,rgba(255,200,0,.18),transparent); border:none; margin:.8rem 0 .5rem; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="lang-title">🌍 Língua Estrangeira ENEM — botões dedicados:</p>', unsafe_allow_html=True)
+st.markdown('<p class="lang-header">🌍 Língua Estrangeira ENEM</p>', unsafe_allow_html=True)
 
 _carregando_agora = st.session_state.get("carregando", False)
-_col_en, _col_es, _col_lang_spacer = st.columns([1, 1, 5])
+_spc, _col_en, _col_es, _spc2 = st.columns([2, 1, 1, 2])
 
 with _col_en:
-    st.markdown("""
-    <style>
-    div[data-testid="stHorizontalBlock"]:has(.lang-gold) button {
-        border: 1.5px solid #ffc800 !important;
-        color: #ffc800 !important;
-        background: rgba(255,200,0,.06) !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.lang-gold) button:hover {
-        box-shadow: 0 0 12px rgba(255,200,0,.35) !important;
-    }
-    </style>
-    <span class="lang-gold" style="display:none"></span>
-    """, unsafe_allow_html=True)
-    if st.button("🇬🇧 Inglês", key="btn_lang_ingles", use_container_width=True, disabled=_carregando_agora):
+    if st.button("🇬🇧 EN Inglês", key="btn_lang_ingles", use_container_width=True, disabled=_carregando_agora):
         st.session_state["lang_clicada"] = "ingles"
         st.session_state["tema_input"]   = "Inglês ENEM"
         st.rerun()
 
 with _col_es:
-    if st.button("🇪🇸 Espanhol", key="btn_lang_espanhol", use_container_width=True, disabled=_carregando_agora):
+    if st.button("🇪🇸 ES Espanhol", key="btn_lang_espanhol", use_container_width=True, disabled=_carregando_agora):
         st.session_state["lang_clicada"] = "espanhol"
         st.session_state["tema_input"]   = "Espanhol ENEM"
         st.rerun()
 
-st.markdown('<hr class="neon-divider">', unsafe_allow_html=True)
+st.markdown('<hr class="lang-sep">', unsafe_allow_html=True)
 
 # ── Balões de temas interativos ───────────────────────────────────────────────
 import random as _random
