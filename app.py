@@ -9,6 +9,19 @@ from agents.orchestrator import KnowSynth as EduSynth
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+# FIX 3 — Fonte única de verdade para detecção de idioma estrangeiro
+# Usada por _iniciar_tema, pelo botão "Estudar Agora" e pelo aviso de idioma
+def _detectar_idioma_tema(tema: str) -> str:
+    """Retorna 'ingles', 'espanhol' ou '' conforme o tema informado."""
+    t = tema.lower().strip()
+    if any(k in t for k in ("inglês", "ingles", "english", "língua inglesa")):
+        return "ingles"
+    if any(k in t for k in ("espanhol", "español", "spanish", "língua espanhola")):
+        return "espanhol"
+    return ""
+
+
 def _atualizar_dicas_historico(tema: str, nivel: int):
     hist = st.session_state["historico"]
     st.session_state["historico"] = [
@@ -905,7 +918,13 @@ def _iniciar_tema(tema: str, modo_idioma: str = ""):
     Passo 1: limpa todo o conteúdo anterior e sinaliza 'limpando'.
     O rerun seguinte mostra a tela com balões (estado zerado).
     Passo 2: no próximo rerun, limpando=False e carregando=True dispara o pipeline.
+
+    FIX 1 — Auto-detecta idioma quando não passado explicitamente.
+    Garante que balões e histórico com "Inglês ENEM" ativem search_language_questions.
     """
+    if not modo_idioma:
+        modo_idioma = _detectar_idioma_tema(tema)
+
     st.session_state.update({
         "resultado_atual":  None,
         "tema_input":       tema,
@@ -933,11 +952,9 @@ if st.session_state.get("balao_clicado") and st.session_state["tema_input"]:
     st.session_state["balao_clicado"] = False
     _iniciar_tema(st.session_state["tema_input"])
 
-# Botão "Estudar Agora" — com detecção de idioma no campo de texto
-_TERMOS_IDIOMA_INPUT = {"inglês", "ingles", "english", "espanhol", "spanish", "español"}
+# Botão "Estudar Agora" — usa _detectar_idioma_tema como fonte única (FIX 3)
 if iniciar and tema_digitado.strip():
-    _t_lower = tema_digitado.strip().lower()
-    if any(t in _t_lower for t in _TERMOS_IDIOMA_INPUT):
+    if _detectar_idioma_tema(tema_digitado.strip()):
         st.warning("Para estudar Inglês ou Espanhol, use os botões dedicados acima 👆")
     else:
         _iniciar_tema(tema_digitado.strip())
@@ -1237,15 +1254,16 @@ if st.session_state["resultado_atual"]:
                 if tentativas == 1:
                     st.balloons()
 
+                # FIX 5 — busca e exibe gabarito no mesmo ciclo (sem rerun extra)
                 if not gabarito_vis:
                     with st.spinner("Gerando gabarito comentado..."):
                         r = edu.request_gabarito(res["tema"], questao_gabarito, force=True)
                     if not r.get("erro"):
-                        st.session_state["gabarito_texto"] = r["gabarito"]
-                        st.rerun()
+                        gabarito_vis = r["gabarito"]
+                        st.session_state["gabarito_texto"] = gabarito_vis
 
-                if st.session_state["gabarito_texto"]:
-                    st.markdown(f'<div class="gabarito-box"><b>✅ Gabarito Comentado</b><br>{st.session_state["gabarito_texto"]}</div>', unsafe_allow_html=True)
+                if gabarito_vis:
+                    st.markdown(f'<div class="gabarito-box"><b>✅ Gabarito Comentado</b><br>{gabarito_vis}</div>', unsafe_allow_html=True)
 
                 return True  # questão resolvida
 

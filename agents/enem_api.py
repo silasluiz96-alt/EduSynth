@@ -42,10 +42,15 @@ DISCIPLINES = {
 # Valores do campo "language" na API enem.dev que indicam idioma estrangeiro
 _LANGUAGE_SLUGS_ESTRANGEIRO = {"ingles", "espanhol", "english", "spanish"}
 
-# Palavras-gatilho para detecção de inglês (3+ ocorrências → inglês)
+# FIX 2 — Palavras-gatilho para detecção de inglês
+# Threshold baixado para 2+ (antes era 3) e vocabulário expandido.
+# Questões de inglês no ENEM costumam ter textos curtos — 3 hits era restritivo demais.
 _PALAVRAS_INGLES = {
     "the", "is", "are", "was", "were", "have", "has", "that", "this",
     "with", "from", "they", "their", "would", "could", "should",
+    "which", "when", "what", "where", "been", "will", "than", "then",
+    "about", "into", "after", "some", "more", "also", "text", "read",
+    "not", "but", "for", "its", "him", "her", "can", "all", "one",
 }
 
 # Palavras-gatilho para detecção de espanhol (3+ ocorrências → espanhol)
@@ -370,13 +375,14 @@ def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
                 break
 
             for q in questoes_pagina:
-                # Filtra idioma estrangeiro
-                if (q.get("language") or ""):
-                    continue
                 # Filtra disciplina (client-side, pois filtro da API não funciona)
                 if disciplina and q.get("discipline") != disciplina:
                     continue
                 qf = _formatar_questao(q, ano=ano)
+                # FIX 4 — usa _detectar_idioma_estrangeiro (robusto) em vez de
+                # checar q.get("language") inline — captura inglês por heurística também
+                if _detectar_idioma_estrangeiro(qf):
+                    continue
                 # Filtra por keyword no texto
                 texto = " ".join([
                     (qf.get("contexto") or ""),
@@ -525,8 +531,8 @@ def search_language_questions(language: str) -> list[dict]:
                     continue  # inglês sempre fica em linguagens
                 contexto = (q.get("context") or "").lower()
                 palavras = set(re.sub(r"[^\w\s]", "", contexto).split())
-                if sum(1 for p in _PALAVRAS_INGLES if p in palavras) < 3:
-                    continue  # não parece inglês
+                if sum(1 for p in _PALAVRAS_INGLES if p in palavras) < 2:
+                    continue  # não parece inglês (threshold 2 — FIX 2)
 
             questoes.append(_formatar_questao(q, ano=ano))
             if len(questoes) >= 6:
