@@ -209,6 +209,7 @@ def _formatar_questao(q: dict, ano: int = None) -> dict:
         "indice":          q.get("index"),
         "enunciado":       enunciado,
         "contexto":        contexto,
+        "files":           [f for f in (q.get("files") or []) if f and "broken-image" not in f],
         "alternativas":    alternativas,
         "gabarito":        gabarito,
         "gabarito_interno": gabarito,   # compatibilidade com Estrategista

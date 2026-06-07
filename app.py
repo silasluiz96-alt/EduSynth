@@ -824,6 +824,22 @@ st.markdown('<hr class="lang-sep">', unsafe_allow_html=True)
 
 # ── Balões de temas interativos ───────────────────────────────────────────────
 import random as _random
+import re as _re
+
+# Converte ![alt](url) → <img> HTML; descarta broken-images
+_IMG_MD = _re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
+
+def _md_imgs_para_html(texto: str) -> str:
+    """Substitui markdown de imagem por tag <img> renderizável no st.markdown."""
+    def _sub(m):
+        alt, url = m.group(1), m.group(2)
+        if not url or "broken-image" in url:
+            return ""
+        return (
+            f'<img src="{url}" alt="{alt}" '
+            f'style="max-width:100%;border-radius:8px;margin:.6rem 0;display:block">'
+        )
+    return _IMG_MD.sub(_sub, texto)
 
 _TODOS_TEMAS = [
     # Ciências Humanas
@@ -1249,19 +1265,28 @@ if st.session_state["resultado_atual"]:
 
             # Contexto / texto de apoio
             contexto = questao_exibir.get("contexto") or questao_exibir.get("texto_apoio", "")
-            if contexto:
+            files    = questao_exibir.get("files", [])
+            if contexto or files:
+                contexto_html = _md_imgs_para_html(contexto) if contexto else ""
+                # Imagens do campo files (tabelas, gráficos separados do texto)
+                files_html = "".join(
+                    f'<img src="{url}" style="max-width:100%;border-radius:8px;margin:.6rem 0;display:block">'
+                    for url in files
+                )
                 st.markdown(
                     f'<div style="background:#1a1a2e;border:2.5px solid rgba(157,78,221,.5);border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">'
                     f'<span style="color:#00f5ff;font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase">Texto de Apoio</span><br><br>'
-                    f'<span style="color:#ffffff;font-size:.9rem;line-height:1.6">{contexto}</span></div>',
+                    f'<span style="color:#ffffff;font-size:.9rem;line-height:1.6">{contexto_html}</span>'
+                    f'{files_html}</div>',
                     unsafe_allow_html=True,
                 )
 
             enunciado = questao_exibir.get("enunciado") or questao_exibir.get("alternativesIntroduction", "")
             if enunciado:
+                enunciado_html = _md_imgs_para_html(enunciado)
                 st.markdown(
                     f'<div style="background:#1a1a2e;border:2.5px solid rgba(0,245,255,.5);border-radius:12px;padding:1rem 1.2rem;margin:.5rem 0">'
-                    f'<b style="color:#ffffff;font-size:.95rem;line-height:1.6">{enunciado}</b></div>',
+                    f'<b style="color:#ffffff;font-size:.95rem;line-height:1.6">{enunciado_html}</b></div>',
                     unsafe_allow_html=True,
                 )
 
