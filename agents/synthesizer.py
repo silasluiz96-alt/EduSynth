@@ -47,42 +47,67 @@ def _serializar_pesquisa(r: dict) -> str:
 
 
 def _serializar_critica(r: dict) -> str:
-    """Extrai o essencial do output do Crítico."""
-    partes = [f"PRIORIDADE: {r.get('nivel_prioridade', '')}"]
+    """
+    Extrai o essencial do output do Crítico.
 
+    Defensivo: cada campo pode ser dict (formato rico do JSON do LLM)
+    ou string/lista simples (fallback quando o parse parcial retorna menos).
+    """
+    partes = [f"PRIORIDADE: {r.get('nivel_prioridade', '') or r.get('dificuldade_provavel', '')}"]
+
+    # frequencia_enem: dict rico OU string simples
     freq = r.get("frequencia_enem", {})
     if freq:
-        areas = ", ".join(freq.get("areas", []))
-        partes.append(
-            f"FREQUÊNCIA NO ENEM: {freq.get('descricao', '')} | Áreas: {areas} | "
-            f"Profundidade: {freq.get('profundidade', '')}"
-        )
+        if isinstance(freq, dict):
+            areas = ", ".join(freq.get("areas", []))
+            partes.append(
+                f"FREQUÊNCIA NO ENEM: {freq.get('descricao', '')} | Áreas: {areas} | "
+                f"Profundidade: {freq.get('profundidade', '')}"
+            )
+        else:
+            partes.append(f"FREQUÊNCIA NO ENEM: {freq}")
 
+    # erros_comuns: lista de dicts OU lista de strings
     erros = r.get("erros_comuns", [])
     if erros:
         partes.append("ERROS COMUNS DOS ESTUDANTES:")
         for e in erros[:3]:
-            partes.append(f"  - {e.get('erro', '')}: {e.get('como_evitar', '')}")
+            if isinstance(e, dict):
+                partes.append(f"  - {e.get('erro', '')}: {e.get('como_evitar', '')}")
+            else:
+                partes.append(f"  - {e}")
 
-    conexoes = r.get("conexoes_interdisciplinares", [])
+    # conexoes_interdisciplinares ou conexoes: lista de dicts OU lista de strings
+    conexoes = r.get("conexoes_interdisciplinares") or r.get("conexoes", [])
     if conexoes:
         partes.append("CONEXÕES INTERDISCIPLINARES:")
         for c in conexoes[:4]:
-            partes.append(
-                f"  - {c.get('disciplina', '')}: {c.get('conexao', '')} "
-                f"(ENEM: {c.get('exemplo_enem', '')})"
-            )
+            if isinstance(c, dict):
+                partes.append(
+                    f"  - {c.get('disciplina', '')}: {c.get('conexao', '')} "
+                    f"(ENEM: {c.get('exemplo_enem', '')})"
+                )
+            else:
+                partes.append(f"  - {c}")
 
+    # pontos_criticos: lista de dicts OU lista de strings
     criticos = r.get("pontos_criticos", [])
     if criticos:
         partes.append("PONTOS CRÍTICOS OBRIGATÓRIOS:")
         for p in criticos:
-            ancora = " [ÂNCORA]" if p.get("ancora") else ""
-            partes.append(f"  - {p.get('conceito', '')}{ancora}: {p.get('descricao', '')}")
+            if isinstance(p, dict):
+                ancora = " [ÂNCORA]" if p.get("ancora") else ""
+                partes.append(f"  - {p.get('conceito', '')}{ancora}: {p.get('descricao', '')}")
+            else:
+                partes.append(f"  - {p}")
 
+    # contexto_atual: dict OU string
     ctx = r.get("contexto_atual", {})
     if ctx:
-        partes.append(f"CONTEXTO ATUAL: {ctx.get('eventos_recentes', '')} | {ctx.get('debate_atual', '')}")
+        if isinstance(ctx, dict):
+            partes.append(f"CONTEXTO ATUAL: {ctx.get('eventos_recentes', '')} | {ctx.get('debate_atual', '')}")
+        else:
+            partes.append(f"CONTEXTO ATUAL: {ctx}")
 
     return "\n".join(partes)
 

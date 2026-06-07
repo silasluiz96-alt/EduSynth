@@ -16,6 +16,7 @@ import sys
 import json
 import random
 import logging
+import unicodedata
 from dotenv import load_dotenv
 import requests
 
@@ -62,27 +63,75 @@ _PALAVRAS_ESPANHOL = {
     "pero", "más", "también",
 }
 
+def _normalizar_tema(s: str) -> str:
+    """
+    Remove acentos e converte para minúsculas.
+    Usado para comparar temas sem depender de acentuação exata.
+    Ex: "Fotossíntese" → "fotossintese"  |  "fordismo" → "fordismo"
+    """
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode().lower().strip()
+
+
 # Mapa tema → disciplina na API enem.dev
+# Chaves já normalizadas (sem acento, minúsculas) para funcionar com _normalizar_tema()
 TEMA_DISCIPLINA: dict[str, str] = {
     # Ciências Humanas
-    "revolução industrial":        "ciencias-humanas",
+    "revolucao industrial":        "ciencias-humanas",
     "segunda guerra mundial":      "ciencias-humanas",
     "ditadura militar brasileira": "ciencias-humanas",
-    "globalização":                "ciencias-humanas",
+    "globalizacao":                "ciencias-humanas",
+    "fordismo":                    "ciencias-humanas",
+    "taylorismo":                  "ciencias-humanas",
+    "escravidao":                  "ciencias-humanas",
+    "colonizacao":                 "ciencias-humanas",
+    "iluminismo":                  "ciencias-humanas",
+    "revolucao francesa":          "ciencias-humanas",
+    "imperialismo":                "ciencias-humanas",
+    "guerra fria":                 "ciencias-humanas",
+    "nazismo":                     "ciencias-humanas",
+    "fascismo":                    "ciencias-humanas",
+    "socialismo":                  "ciencias-humanas",
+    "capitalismo":                 "ciencias-humanas",
+    "democracia":                  "ciencias-humanas",
+    "diversidade cultural":        "ciencias-humanas",
+    "cultura afro-brasileira":     "ciencias-humanas",
+    "povos indigenas":             "ciencias-humanas",
+    "direitos humanos":            "ciencias-humanas",
+    "cidadania":                   "ciencias-humanas",
     # Ciências da Natureza
     "aquecimento global":          "ciencias-natureza",
-    "fotossíntese":                "ciencias-natureza",
-    "genética mendeliana":         "ciencias-natureza",
+    "fotossintese":                "ciencias-natureza",
+    "genetica mendeliana":         "ciencias-natureza",
     "leis de newton":              "ciencias-natureza",
+    "evolucao biologica":          "ciencias-natureza",
+    "ecologia":                    "ciencias-natureza",
+    "biomas brasileiros":          "ciencias-natureza",
+    "quimica organica":            "ciencias-natureza",
+    "eletromagnetismo":            "ciencias-natureza",
+    "termodinamica":               "ciencias-natureza",
+    "celula":                      "ciencias-natureza",
+    "metabolismo":                 "ciencias-natureza",
+    "reacoes quimicas":            "ciencias-natureza",
+    "tabela periodica":            "ciencias-natureza",
     # Matemática
-    "funções do 1º e 2º grau":    "matematica",
-    "progressão aritmética":       "matematica",
+    "funcoes do 1o e 2o grau":    "matematica",
+    "progressao aritmetica":       "matematica",
     "probabilidade":               "matematica",
     "geometria plana":             "matematica",
+    "estatistica":                 "matematica",
+    "geometria espacial":          "matematica",
+    "trigonometria":               "matematica",
+    "logaritmos":                  "matematica",
+    "matrizes":                    "matematica",
+    "financas":                    "matematica",
     # Linguagens
     "modernismo brasileiro":       "linguagens",
-    "interpretação de texto":      "linguagens",
+    "interpretacao de texto":      "linguagens",
     "figuras de linguagem":        "linguagens",
+    "literatura brasileira":       "linguagens",
+    "generos textuais":            "linguagens",
+    "redacao enem":                "linguagens",
+    "variacao linguistica":        "linguagens",
 }
 
 # Offset inicial por disciplina (onde as questões dessa disciplina começam na prova)
@@ -94,26 +143,66 @@ _OFFSET_DISCIPLINA: dict[str, int] = {
 }
 
 # Mapa tema → palavras-chave para filtro de texto (sem LLM)
+# Chaves normalizadas (sem acento) — mesma convenção do TEMA_DISCIPLINA
+# Os termos de busca são em português COM acento (como aparecem nos textos do ENEM)
 _KEYWORDS_TEMA: dict[str, list[str]] = {
     # Ciências Humanas
-    "revolução industrial":        ["revolução industrial", "industrialização", "vapor", "operário", "fábrica", "ford", "taylor"],
-    "segunda guerra mundial":      ["segunda guerra", "nazismo", "holocausto", "hitler", "aliados", "guerra mundial"],
-    "ditadura militar brasileira": ["ditadura militar", "golpe", "regime militar", "AI-5", "redemocratização", "censura"],
-    "globalização":                ["globalização", "neoliberal", "mercado global", "fmi", "interdependência", "livre-comércio"],
+    "revolucao industrial":        ["revolução industrial", "industrialização", "vapor", "operário", "fábrica", "ford", "taylor", "maquinismo"],
+    "segunda guerra mundial":      ["segunda guerra", "nazismo", "holocausto", "hitler", "aliados", "guerra mundial", "fascismo", "totalitarismo"],
+    "ditadura militar brasileira": ["ditadura militar", "golpe", "regime militar", "ai-5", "redemocratização", "censura", "repressão", "anistia"],
+    "globalizacao":                ["globalização", "neoliberal", "mercado global", "fmi", "interdependência", "livre-comércio", "mundialização"],
+    "fordismo":                    ["fordismo", "fordista", "linha de montagem", "produção em série", "ford", "taylor", "taylorismo", "produção em massa", "industrialização"],
+    "taylorismo":                  ["taylorismo", "taylor", "fordismo", "administração científica", "produção em série", "eficiência produtiva"],
+    "escravidao":                  ["escravidão", "escravo", "tráfico", "abolição", "quilombo", "senzala", "trabalho escravo", "escravizado"],
+    "colonizacao":                 ["colonização", "colônia", "colonialismo", "colonizador", "metrópole", "exploração colonial", "ciclo econômico"],
+    "iluminismo":                  ["iluminismo", "ilustração", "razão", "contrato social", "locke", "rousseau", "voltaire", "montesquieu"],
+    "revolucao francesa":          ["revolução francesa", "liberdade igualdade fraternidade", "bastilha", "jacobinos", "declaração dos direitos"],
+    "imperialismo":                ["imperialismo", "colonialismo", "neocolonialismo", "partilha da áfrica", "potências europeias"],
+    "guerra fria":                 ["guerra fria", "capitalismo", "socialismo", "urss", "eua", "bipolaridade", "cortina de ferro", "muro de berlim"],
+    "nazismo":                     ["nazismo", "nazista", "hitler", "holocausto", "terceiro reich", "antissemitismo", "fascismo"],
+    "fascismo":                    ["fascismo", "mussolini", "totalitarismo", "nazismo", "estado nacional", "corporativismo"],
+    "socialismo":                  ["socialismo", "marxismo", "comunismo", "marx", "engels", "luta de classes", "proletariado", "burguesia"],
+    "capitalismo":                 ["capitalismo", "mercado", "burguesia", "proletariado", "mais-valia", "acumulação de capital", "neoliberalismo"],
+    "democracia":                  ["democracia", "sufrágio", "constituição", "cidadania", "direitos", "voto", "república", "separação de poderes"],
+    "diversidade cultural":        ["diversidade cultural", "multiculturalismo", "identidade cultural", "etnocentrismo", "relativismo cultural"],
+    "cultura afro-brasileira":     ["afro-brasileiro", "afrodescendente", "quilombo", "candomblé", "umbanda", "cultura africana", "racismo"],
+    "povos indigenas":             ["indígena", "povos originários", "aldeamento", "demarcação", "cultura indígena", "etnias"],
+    "direitos humanos":            ["direitos humanos", "onu", "declaração universal", "cidadania", "dignidade humana", "liberdade"],
+    "cidadania":                   ["cidadania", "direitos", "deveres", "democracia", "participação política", "constituição"],
     # Ciências da Natureza
-    "aquecimento global":          ["aquecimento global", "efeito estufa", "clima", "carbono", "emissão", "temperatura"],
-    "fotossíntese":                ["fotossíntese", "clorofila", "luz solar", "glicose", "cloroplasto", "fotossintético"],
-    "genética mendeliana":         ["mendel", "hereditariedade", "dominante", "recessivo", "gene", "genótipo", "fenótipo"],
-    "leis de newton":              ["newton", "inércia", "força", "movimento", "aceleração", "dinâmica", "gravitação"],
+    "aquecimento global":          ["aquecimento global", "efeito estufa", "clima", "carbono", "emissão", "temperatura", "mudanças climáticas"],
+    "fotossintese":                ["fotossíntese", "fotossíntese", "clorofila", "luz solar", "glicose", "cloroplasto", "fotossintético", "fotossintese"],
+    "genetica mendeliana":         ["mendel", "hereditariedade", "dominante", "recessivo", "gene", "genótipo", "fenótipo", "alelo"],
+    "leis de newton":              ["newton", "inércia", "força", "movimento", "aceleração", "dinâmica", "gravitação", "segunda lei"],
+    "evolucao biologica":          ["evolução", "darwin", "seleção natural", "adaptação", "espécie", "mutação", "ancestral comum"],
+    "ecologia":                    ["ecossistema", "cadeia alimentar", "teia alimentar", "bioma", "biodiversidade", "nicho ecológico", "ciclos biogeoquímicos"],
+    "biomas brasileiros":          ["cerrado", "amazônia", "caatinga", "mata atlântica", "pantanal", "pampa", "bioma", "biodiversidade"],
+    "quimica organica":            ["orgânica", "carbono", "hidrocarboneto", "álcool", "aldéido", "cetona", "ácido carboxílico", "éster"],
+    "eletromagnetismo":            ["eletromagnetismo", "campo elétrico", "campo magnético", "indução eletromagnética", "circuito", "corrente elétrica"],
+    "termodinamica":               ["termodinâmica", "calor", "temperatura", "entropia", "trabalho", "primeira lei", "segunda lei"],
+    "celula":                      ["célula", "membrana", "núcleo", "mitocôndria", "ribossomo", "divisão celular", "mitose", "meiose"],
+    "metabolismo":                 ["metabolismo", "respiração celular", "fermentação", "atp", "enzima", "catabolismo", "anabolismo"],
+    "reacoes quimicas":            ["reação química", "reagente", "produto", "balanceamento", "estequiometria", "cinética", "equilíbrio"],
+    "tabela periodica":            ["tabela periódica", "elemento", "metal", "não-metal", "grupo", "período", "propriedades periódicas"],
     # Matemática
-    "funções do 1º e 2º grau":    ["função", "parábola", "raiz", "coeficiente", "equação", "gráfico"],
-    "progressão aritmética":       ["progressão aritmética", "razão", "sequência", "termo", "pa"],
-    "probabilidade":               ["probabilidade", "evento", "espaço amostral", "combinatória", "chance"],
-    "geometria plana":             ["área", "perímetro", "triângulo", "círculo", "quadrado", "polígono"],
+    "funcoes do 1o e 2o grau":    ["função", "parábola", "raiz", "coeficiente", "equação", "gráfico", "domínio", "imagem"],
+    "progressao aritmetica":       ["progressão aritmética", "razão", "sequência", "termo", "pa", "soma dos termos"],
+    "probabilidade":               ["probabilidade", "evento", "espaço amostral", "combinatória", "chance", "favorável"],
+    "geometria plana":             ["área", "perímetro", "triângulo", "círculo", "quadrado", "polígono", "trapézio"],
+    "estatistica":                 ["média", "mediana", "moda", "desvio", "gráfico", "tabela", "frequência", "probabilidade"],
+    "geometria espacial":          ["volume", "superfície", "cubo", "cilindro", "cone", "esfera", "pirâmide", "prisma"],
+    "trigonometria":               ["seno", "cosseno", "tangente", "ângulo", "triângulo retângulo", "lei dos cossenos"],
+    "logaritmos":                  ["logaritmo", "log", "base", "expoente", "exponencial", "potência"],
+    "matrizes":                    ["matriz", "determinante", "sistemas lineares", "equação linear", "escalonamento"],
+    "financas":                    ["juros", "porcentagem", "desconto", "taxa", "capital", "montante", "financiamento"],
     # Linguagens
-    "modernismo brasileiro":       ["modernismo", "semana de arte moderna", "1922", "vanguarda", "modernista"],
-    "interpretação de texto":      ["inferência", "compreensão", "leitura", "texto", "interpretação"],
-    "figuras de linguagem":        ["metáfora", "metonímia", "ironia", "hipérbole", "figura de linguagem"],
+    "modernismo brasileiro":       ["modernismo", "semana de arte moderna", "1922", "vanguarda", "modernista", "pau-brasil"],
+    "interpretacao de texto":      ["inferência", "compreensão", "leitura", "texto", "interpretação", "implícito"],
+    "figuras de linguagem":        ["metáfora", "metonímia", "ironia", "hipérbole", "figura de linguagem", "comparação"],
+    "literatura brasileira":       ["literatura", "romantismo", "realismo", "naturalismo", "parnasianismo", "simbolismo", "modernismo"],
+    "generos textuais":            ["crônica", "conto", "poema", "artigo", "editorial", "gênero textual", "tipologia"],
+    "redacao enem":                ["redação", "dissertação", "argumentação", "tese", "proposta de intervenção", "coesão"],
+    "variacao linguistica":        ["variação linguística", "dialeto", "registro", "norma culta", "socioleto", "linguagem"],
 }
 
 
@@ -158,13 +247,26 @@ def _detectar_idioma_estrangeiro(questao: dict) -> bool:
 
 # ── Helpers internos ──────────────────────────────────────────────────────────
 
-def _get(endpoint: str, params: dict = None) -> dict | list | None:
-    """GET na API com log de URL, status e erros."""
+def _get(endpoint: str, params: dict = None, _tentativa: int = 1) -> dict | list | None:
+    """
+    GET na API com log de URL, status e erros.
+    Retry automático uma vez em caso de 429 (rate limit), com pausa de 3 segundos.
+    """
+    import time as _time
+
     url = f"{BASE_URL}{endpoint}"
     log.info(f"GET {url} | params={params}")
     try:
         r = requests.get(url, params=params, timeout=TIMEOUT)
         log.info(f"  → status={r.status_code} | size={len(r.content)} bytes")
+
+        # Rate limit — aguarda e tenta mais uma vez
+        if r.status_code == 429 and _tentativa < 3:
+            espera = 3 * _tentativa  # 3s na 1ª tentativa, 6s na 2ª
+            log.warning(f"  Rate limit (429) — aguardando {espera}s antes de tentar novamente...")
+            _time.sleep(espera)
+            return _get(endpoint, params=params, _tentativa=_tentativa + 1)
+
         r.raise_for_status()
         return r.json()
     except requests.exceptions.ConnectionError:
@@ -346,21 +448,24 @@ def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
     3. Para ao acumular 10 questões da disciplina que contenham keyword do tema
     4. Retorna as brutas para classificar_top3() no caller
     """
-    _ANOS = [2023, 2022, 2021]
-    topic_lower = topic.lower().strip()
+    _ANOS = [2023, 2022, 2021, 2020, 2019]
+    topic_norm = _normalizar_tema(topic)  # sem acentos, minúsculas
 
-    # Resolve disciplina
-    disciplina = TEMA_DISCIPLINA.get(topic_lower)
+    # Resolve disciplina — usa chave normalizada para tolerar acentuação
+    disciplina = TEMA_DISCIPLINA.get(topic_norm)
     offset_ini = _OFFSET_DISCIPLINA.get(disciplina, 0) if disciplina else 0
 
-    # Resolve keywords: mapa fixo + palavras longas do próprio tema
-    keywords = list(_KEYWORDS_TEMA.get(topic_lower, []))
-    keywords += [p.lower() for p in topic_lower.split() if len(p) > 4]
-    keywords = list(dict.fromkeys(keywords))  # deduplicar mantendo ordem
+    # Resolve keywords: mapa fixo + palavras longas do próprio tema (original, com acento)
+    keywords_raw = list(_KEYWORDS_TEMA.get(topic_norm, []))
+    keywords_raw += [p.lower() for p in topic.lower().strip().split() if len(p) > 4]
+    keywords_raw = list(dict.fromkeys(keywords_raw))  # deduplicar mantendo ordem
+
+    # Normaliza também as keywords para comparar com texto normalizado da questão
+    keywords_norm = [_normalizar_tema(kw) for kw in keywords_raw]
 
     log.info(
-        f"search_questions_by_topic('{topic}') | disciplina={disciplina} "
-        f"offset_ini={offset_ini} | keywords={keywords[:5]}"
+        f"search_questions_by_topic('{topic}') | topic_norm='{topic_norm}' | disciplina={disciplina} "
+        f"offset_ini={offset_ini} | keywords={keywords_raw[:5]}"
     )
 
     _META   = 10
@@ -393,12 +498,12 @@ def search_questions_by_topic(topic: str, limit: int = 10) -> list[dict]:
                 # checar q.get("language") inline — captura inglês por heurística também
                 if _detectar_idioma_estrangeiro(qf):
                     continue
-                # Filtra por keyword no texto
-                texto = " ".join([
+                # Filtra por keyword no texto — normaliza para tolerar acentuação
+                texto_norm = _normalizar_tema(" ".join([
                     (qf.get("contexto") or ""),
                     (qf.get("enunciado") or ""),
-                ]).lower()
-                if keywords and not any(kw in texto for kw in keywords):
+                ]))
+                if keywords_norm and not any(kw in texto_norm for kw in keywords_norm):
                     continue
                 # Descarta questões cujas alternativas são imagens (texto vazio)
                 # — o app não consegue exibir alternativas sem texto
