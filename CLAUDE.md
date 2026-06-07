@@ -25,9 +25,12 @@ O estudante digita um tema (ex: "fordismo", "fotossíntese", "Revolução Indust
 | Camada | Tecnologia | Uso |
 |---|---|---|
 | Interface | Streamlit | App web responsivo |
-| LLM Provider | Groq API | Inferência rápida e gratuita |
-| Modelo LLM | `llama-3.3-70b-versatile` | Todos os agentes que usam IA generativa |
+| LLM Principal | Gemini 2.5 Flash-Lite | Todos os agentes que usam IA generativa |
+| LLM Fallback | Groq `llama-3.3-70b-versatile` | Fallback automático quando Gemini falha |
 | Busca Web | Tavily API | 3 camadas: didático, notícias, acadêmico |
+| Questões reais | enem.dev API | Banco ENEM 2021–2023 |
+| Persistência | DuckDB (local) | Sessões e chamadas de agentes gravadas por sessão |
+| Transformação | dbt-duckdb | Modelos staging e marts sobre os dados brutos (em implementação) |
 | Runtime | Python 3.14 | Linguagem principal |
 | Env vars | python-dotenv | Carregamento do `.env` |
 | Versionamento | Git + GitHub | Repositório: silasluiz96-alt/KnowSynth |
@@ -84,7 +87,7 @@ python -m streamlit run app.py
 - **Input:** eventos da sessão (pesquisas, dicas, gabaritos)
 - **Função:** Rastreia comportamento e gera relatório ao final da sessão
 - **Métodos:** `register_search()`, `register_hint()`, `register_gabarito()`, `generate_report()`, `snapshot()`
-- **v1:** Memória limitada à sessão atual. **v2:** Supabase para memória permanente.
+- **v1:** Memória de sessão gravada localmente no DuckDB via `utils/analytics_db.py`. Dados acumulados entre sessões na aba Analytics.
 
 ### Orquestrador (`agents/orchestrator.py`)
 - **Classe:** `KnowSynth`
@@ -102,7 +105,7 @@ python -m streamlit run app.py
 | `critic.md` | Crítico | Análise estratégica ENEM, nível de prioridade, tom direto |
 | `synthesizer.md` | Sintetizador | 7 seções do material, gabarito só via Estrategista |
 | `strategist.md` | Estrategista | Sistema de 3 dicas, técnicas por área, gabarito comentado |
-| `performance_analyst.md` | Analista | Rastreamento de sessão, relatório, preview v2 Supabase |
+| `performance_analyst.md` | Analista | Rastreamento de sessão, relatório, sugestões para próxima sessão |
 
 ---
 
@@ -119,7 +122,8 @@ python -m streamlit run app.py
 - [x] Sistema de 3 dicas progressivas com bloqueio do gabarito
 - [x] Rastreamento de desempenho na sessão com relatório
 - [x] Histórico de temas na sidebar com contador de dicas
-- [x] Preview da v2 com Supabase na sidebar
+- [x] Analytics de sessões com DuckDB — aba dedicada com histórico acumulado
+- [x] Card de próximas funcionalidades na sidebar (e-mail, dbt, mapa de pontos fracos)
 - [x] `.gitignore` configurado (`.env` não commitado)
 - [x] README.md profissional com arquitetura e roadmap
 - [x] Repositório no GitHub: `silasluiz96-alt/KnowSynth`
@@ -135,11 +139,11 @@ python -m streamlit run app.py
 - [ ] Testar o app completo com tema real e verificar fluxo ponta a ponta
 - [ ] Adicionar campo de área do conhecimento no input do usuário
 
-### Médio prazo (v2 — Supabase)
-- [ ] Autenticação com Google via Supabase Auth
-- [ ] Salvar histórico de sessões no banco de dados
-- [ ] Mapa de pontos fracos persistente por estudante
-- [ ] Dashboard de evolução semanal/mensal
+### Médio prazo (v2 — dados e comunicação)
+- [ ] Modelos dbt: staging e marts sobre raw_sessions e raw_agent_calls
+- [ ] Envio do relatório de sessão por e-mail via SendGrid (opcional, solicitado ao encerrar)
+- [ ] Mapa de pontos fracos persistente — evolução entre sessões
+- [ ] Dashboard de evolução com visualizações (tempo médio, fallback rate, temas revisitados)
 - [ ] Plano de estudos adaptativo gerado por agente planejador
 
 ### Longo prazo (v3)
@@ -171,8 +175,8 @@ python -m streamlit run app.py
 ### enem.dev para questões reais (v3)
 **Decisão futura:** Integrar o banco de questões reais do ENEM via [enem.dev](https://enem.dev) para que o Estrategista trabalhe com questões históricas além das geradas pela IA.
 
-### Supabase para memória persistente (v2)
-**Decisão futura:** O `PerformanceAnalyst` foi projetado desde o início para ter memória de sessão apenas na v1. Na v2, cada evento (`register_search`, `register_hint`, `register_gabarito`) será persistido no Supabase, permitindo acompanhamento longitudinal do estudante.
+### DuckDB + dbt para persistência e análise (v1.5)
+**Decisão:** Persistência implementada com DuckDB local — sem servidor, sem conta externa, zero custo. `utils/analytics_db.py` grava `raw_sessions` e `raw_agent_calls` ao encerrar cada sessão. O dbt (`dbt-duckdb`) transforma esses dados brutos em modelos staging e marts para consumo analítico. Separação clara: `requirements.txt` (runtime, só `duckdb`) vs `requirements-dev.txt` (dbt como ferramenta de desenvolvedor).
 
 ---
 
