@@ -523,6 +523,24 @@ if st.session_state["sessao_encerrada"]:
     decorrido = _tempo_decorrido()
     edu      = _get_edu()
 
+    # ── Persistência Supabase — executa uma única vez ao encerrar ────────────
+    if st.session_state.get("supabase_sessao_id") is None:
+        _ultimo_tema = st.session_state["historico"][-1][0] if st.session_state["historico"] else ""
+        _disciplina  = st.session_state["historico"][-1][1] if st.session_state["historico"] else None
+        _sessao_id   = save_sessao(
+            aluno_nome = nome,
+            inicio     = st.session_state["sessao_inicio"],
+            fim        = time.time(),
+            tema       = _ultimo_tema,
+            disciplina = _disciplina,
+            meta_tempo = st.session_state["meta_tempo"],
+        )
+        st.session_state["supabase_sessao_id"] = _sessao_id or "erro"
+        if _sessao_id:
+            for _resp in st.session_state.get("respostas_buffer", []):
+                save_resposta(sessao_id=_sessao_id, **_resp)
+    # ─────────────────────────────────────────────────────────────────────────
+
     with st.sidebar:
         st.markdown(f'<p class="sb-name">🎓 {nome}</p>', unsafe_allow_html=True)
         st.markdown('<p style="color:#555;font-size:.8rem">Sessão encerrada</p>', unsafe_allow_html=True)
