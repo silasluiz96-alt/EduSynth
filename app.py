@@ -6,6 +6,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agents.orchestrator import KnowSynth as EduSynth
+from utils.supabase_db import save_sessao, save_resposta, save_questao_cache
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -415,6 +416,9 @@ def _init_state():
         "meta_atingida":    False,
         "pausa_ativa":      False,
         "pausa_inicio":     None,
+        # Supabase
+        "respostas_buffer":    [],   # buffer de respostas — salvo em lote ao encerrar sessão
+        "supabase_sessao_id":  None, # UUID da sessão no Supabase (preenchido ao encerrar)
     }
     for k, v in defaults.items():
         if k not in st.session_state:
