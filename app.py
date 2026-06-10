@@ -6,6 +6,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agents.orchestrator import KnowSynth as EduSynth
+from utils.supabase_db import save_sessao, save_resposta, save_questao_cache
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -415,6 +416,9 @@ def _init_state():
         "meta_atingida":    False,
         "pausa_ativa":      False,
         "pausa_inicio":     None,
+        # Supabase
+        "respostas_buffer":    [],   # buffer de respostas — salvo em lote ao encerrar sessão
+        "supabase_sessao_id":  None, # UUID da sessão no Supabase (preenchido ao encerrar)
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -518,6 +522,24 @@ if st.session_state["sessao_encerrada"]:
     nome     = st.session_state["usuario_nome"]
     decorrido = _tempo_decorrido()
     edu      = _get_edu()
+
+    # ── Persistência Supabase — executa uma única vez ao encerrar ────────────
+    if st.session_state.get("supabase_sessao_id") is None:
+        _ultimo_tema = st.session_state["historico"][-1][0] if st.session_state["historico"] else ""
+        _disciplina  = st.session_state["historico"][-1][1] if st.session_state["historico"] else None
+        _sessao_id   = save_sessao(
+            aluno_nome = nome,
+            inicio     = st.session_state["sessao_inicio"],
+            fim        = time.time(),
+            tema       = _ultimo_tema,
+            disciplina = _disciplina,
+            meta_tempo = st.session_state["meta_tempo"],
+        )
+        st.session_state["supabase_sessao_id"] = _sessao_id or "erro"
+        if _sessao_id:
+            for _resp in st.session_state.get("respostas_buffer", []):
+                save_resposta(sessao_id=_sessao_id, **_resp)
+    # ─────────────────────────────────────────────────────────────────────────
 
     with st.sidebar:
         st.markdown(f'<p class="sb-name">🎓 {nome}</p>', unsafe_allow_html=True)
@@ -1069,6 +1091,19 @@ if st.session_state["carregando"] and st.session_state["tema_pendente"]:
                 st.session_state["fila_questoes"] = fila
                 st.session_state["fila_idx"]      = 0
                 st.session_state["questao_atual"] = fila[0] if fila else None
+                # Registra cada questão no catálogo (upsert — seguro chamar múltiplas vezes)
+                for _q in fila:
+                    _qid = f"{str(_q.get('titulo','sem-titulo'))[:50]}-{_q.get('ano','')}"
+                    save_questao_cache(
+                        questao_id  = _qid,
+                        titulo      = _q.get("titulo"),
+                        ano         = _q.get("ano"),
+                        tema        = tema,
+                        disciplina  = _q.get("disciplina"),
+                        dificuldade = _q.get("dificuldade"),
+                        tem_imagem  = bool(_q.get("files")),
+                        is_ai_generated = False,
+                    )
             post_agent_hook("ENEM API + Ranqueador", _t, success=True)
         except Exception as _e_rank:
             post_agent_hook("ENEM API + Ranqueador", _t, success=False)
@@ -1312,6 +1347,16 @@ if st.session_state["resultado_atual"]:
                         if st.button(letra, key=f"alt_{letra}_{fila_idx}_{tentativas}", use_container_width=True):
                             st.session_state["letra_escolhida"] = letra
                             st.session_state["tentativas"] += 1
+
+                            # Bufferiza resposta para salvar no Supabase ao encerrar sessão
+                            _qid_buf = f"{str(questao_exibir.get('titulo','sem-titulo'))[:50]}-{questao_exibir.get('ano','ai')}"
+                            st.session_state["respostas_buffer"].append({
+                                "questao_id":             _qid_buf,
+                                "alternativa_escolhida":  letra,
+                                "alternativa_correta":    gabarito_correto_q,
+                                "acertou":                letra == gabarito_correto_q,
+                                "dicas_usadas":           nivel_dica,
+                            })
 
                             if letra == gabarito_correto_q:
                                 st.session_state["resposta_correta"] = True
